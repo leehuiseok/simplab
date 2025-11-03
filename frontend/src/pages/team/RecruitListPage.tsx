@@ -184,7 +184,7 @@ const RecruitListPage = () => {
       const teamsResponse = await apiGet<{
         success: boolean;
         data: { teams: Team[] };
-      }>(`/api/teams${queryString ? `?${queryString}` : ""}`);
+      }>(`/api/teams?limit=1000${queryString ? `&${queryString}` : ""}`);
       let teamsWithFavorites = teamsResponse.data.teams;
 
       // 로그인된 사용자의 경우 즐겨찾기 정보도 함께 로드

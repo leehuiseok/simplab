@@ -465,7 +465,7 @@ export const ProfileForm = () => {
   };
 
   return (
-    <div className="rounded-xl bg-slate-100 p-6">
+    <div className="w-full rounded-xl bg-slate-100 p-6">
       {/* Tabs */}
       <div className="mb-6 flex gap-6 text-sm">
         {[

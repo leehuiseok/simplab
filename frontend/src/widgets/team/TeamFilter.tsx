@@ -86,6 +86,7 @@ const TeamFilter = ({ onFilterChange, currentFilters }: TeamFilterProps) => {
 
   // 모집 분야 옵션
   const areaOptions = [
+    "프론트엔드",
     "AI/인공지능",
     "웹개발",
     "모바일앱",

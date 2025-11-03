@@ -74,6 +74,7 @@ const RecruitDetailPage = () => {
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoriteId, setFavoriteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showToast, setShowToast] = useState(false);
   const { user, token } = useAuth();
 
   // 팀 정보 로드
@@ -181,6 +182,15 @@ const RecruitDetailPage = () => {
     navigator.clipboard.writeText(url).then(() => {
       alert("링크가 클립보드에 복사되었습니다.");
     });
+  };
+
+  const handleApply = () => {
+    if (!user) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
   };
 
   // 분야 키워드 파싱
@@ -440,6 +450,12 @@ const RecruitDetailPage = () => {
                     저장
                   </button>
                 )}
+                <button
+                  onClick={handleApply}
+                  className="rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-2 text-sm font-medium shadow-md hover:shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all"
+                >
+                  지원하기
+                </button>
               </div>
             </div>
           </div>
@@ -827,6 +843,13 @@ const RecruitDetailPage = () => {
           </div>
         </section>
       </Container>
+
+      {/* Toast 메시지 */}
+      {showToast && (
+        <div className="fixed top-24 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in">
+          지원이 완료되었습니다!
+        </div>
+      )}
 
       <AppFooter />
     </div>
