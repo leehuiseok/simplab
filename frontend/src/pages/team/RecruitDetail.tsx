@@ -1,5 +1,5 @@
 import Container from "../../shared/ui/Container";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import Navbar from "../../widgets/navbar/Navbar";
 import AppFooter from "../../widgets/footer/AppFooter";
 import { useEffect, useState } from "react";
@@ -66,7 +66,7 @@ type Contest = {
 
 const RecruitDetailPage = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const [team, setTeam] = useState<TeamDetail | null>(null);
   const [members, setMembers] = useState<ApiTeamMember[]>([]);
   const [projects, setProjects] = useState<TeamProject[]>([]);

@@ -54,7 +54,7 @@ const getDDay = (deadline?: string | null): string => {
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
     // 디버깅 로그 (개발 환경에서만)
-    if (process.env.NODE_ENV === "development") {
+    if (import.meta.env.MODE === "development") {
       console.log("날짜 계산:", {
         deadline,
         deadlineDate: deadlineStart.toISOString().split("T")[0],

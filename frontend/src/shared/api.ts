@@ -1,4 +1,6 @@
-const API_BASE_URL = "http://localhost:4000";
+// 환경변수에서 API URL 가져오기 (없으면 localhost 기본값 사용)
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
 // 인증 헤더를 자동으로 추가하는 헬퍼 함수
 const getAuthHeaders = (): Record<string, string> => {

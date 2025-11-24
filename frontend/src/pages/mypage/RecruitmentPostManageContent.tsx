@@ -207,10 +207,6 @@ const RecruitmentPostManageContent = () => {
           <div className="text-center">
             <div className="rounded-xl border-2 border-dashed border-slate-300 p-8">
               <div className="text-slate-500">
-                <p className="text-lg">아직 속한 팀이 없습니다.</p>
-                <p className="mt-2 text-sm">
-                  먼저 팀을 만들고 모집 공고를 등록해보세요.
-                </p>
                 <Link
                   to="/mypage/posts/create"
                   className="mt-4 inline-block rounded bg-slate-900 px-6 py-3 text-white hover:bg-slate-800"

@@ -178,7 +178,7 @@ router.get(
 
     res.json({
       success: true,
-      data: { messages: (Array.isArray(messages) ? messages : []).reverse() }, // 오래된 순으로 정렬
+      data: { messages: (Array.isArray(messages) ? [...messages] : []).reverse() }, // 오래된 순으로 정렬
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -289,7 +289,7 @@ router.get(
 
     res.json({
       success: true,
-      data: { messages: (Array.isArray(messages) ? messages : []).reverse() }, // 오래된 순으로 정렬
+      data: { messages: (Array.isArray(messages) ? [...messages] : []).reverse() }, // 오래된 순으로 정렬
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -399,9 +399,10 @@ router.post(
     }
 
     // 기본 메시지 설정
+    const contest = contests[0] as { id: number; title: string };
     const defaultMessage =
       message ||
-      `안녕하세요! ${contests[0].title} 공모전에 함께 참가해보시겠어요?`;
+      `안녕하세요! ${contest.title} 공모전에 함께 참가해보시겠어요?`;
 
     // 찔러보기 메시지 저장 (message_type을 'direct'로 설정)
     const [result] = await pool.execute(

@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import Navbar from "../../widgets/navbar/Navbar";
 import AppFooter from "../../widgets/footer/AppFooter";
 import { useEffect, useState } from "react";
-import { apiGet, apiPost } from "@/shared/api";
+import { apiGet } from "@/shared/api";
 import NudgeButton from "../../shared/ui/NudgeButton";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -79,12 +79,7 @@ const ProfileDetailPage = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userFavorites, setUserFavorites] = useState<Favorite[]>([]);
-  const [fit, setFit] = useState<{
-    score: number;
-    level: "excellent" | "good" | "fair" | "poor";
-    reasons: string[];
-  } | null>(null);
-  const [fitLoading, setFitLoading] = useState(false);
+
   const [userTeams, setUserTeams] = useState<UserTeam[]>([]);
   const [userTeamsLoading, setUserTeamsLoading] = useState(false);
   const [reviews, setReviews] = useState<ProfileReview[]>([]);
@@ -104,31 +99,7 @@ const ProfileDetailPage = () => {
       });
   }, [id]);
 
-  // Big Five 기반 적합도 로드
-  useEffect(() => {
-    if (!id) return;
-    setFitLoading(true);
-    apiPost<{
-      success: boolean;
-      data: {
-        score: number;
-        level: "excellent" | "good" | "fair" | "poor";
-        reasons: string[];
-      };
-    }>(`/api/profile/profiles/${id}/fit`)
-      .then((resp) => {
-        setFit({
-          score: resp.data.score,
-          level: resp.data.level,
-          reasons: resp.data.reasons || [],
-        });
-      })
-      .catch((err) => {
-        console.warn("적합도 로드 실패:", err);
-        setFit(null);
-      })
-      .finally(() => setFitLoading(false));
-  }, [id]);
+
 
   // 소속 팀 로드
   useEffect(() => {
@@ -239,35 +210,7 @@ const ProfileDetailPage = () => {
 
   // 로컬 더미 평가 로직 제거 (API 기반으로 대체)
 
-  const getFitColor = (level: string) => {
-    switch (level) {
-      case "excellent":
-        return "bg-green-100 text-green-800 border-green-300";
-      case "good":
-        return "bg-blue-100 text-blue-800 border-blue-300";
-      case "fair":
-        return "bg-yellow-100 text-yellow-800 border-yellow-300";
-      case "poor":
-        return "bg-red-100 text-red-800 border-red-300";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-300";
-    }
-  };
 
-  const getFitLabel = (level: string) => {
-    switch (level) {
-      case "excellent":
-        return "매우 적합";
-      case "good":
-        return "적합";
-      case "fair":
-        return "보통";
-      case "poor":
-        return "부적합";
-      default:
-        return "평가 없음";
-    }
-  };
 
   // (이전 더미 적합성 이유 로직 제거)
 
@@ -312,44 +255,13 @@ const ProfileDetailPage = () => {
                 <div className="text-xl font-bold">
                   {profile?.user.name ?? `프로필 #${id}`}
                 </div>
-                {/* 팀원 적합성 배지 (API 기반) */}
-                {fit && (
-                  <div
-                    className={`rounded-full border px-3 py-1 text-xs font-semibold ${getFitColor(
-                      fit.level
-                    )}`}
-                  >
-                    {getFitLabel(fit.level)} ({fit.score.toFixed(1)}/10)
-                  </div>
-                )}
+
               </div>
               <p className="text-sm text-slate-600">
                 {profile?.bio ?? "소개가 없습니다."}
               </p>
 
-              {/* 팀원 적합성 설명 (API 기반) */}
-              {fit && (
-                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <div className="mb-2 text-xs font-semibold text-slate-700">
-                    적합한 이유:
-                  </div>
-                  {fitLoading ? (
-                    <div className="text-xs text-slate-600">불러오는 중…</div>
-                  ) : (
-                    <ul className="space-y-1">
-                      {(fit.reasons || []).slice(0, 5).map((reason, index) => (
-                        <li
-                          key={index}
-                          className="flex items-center gap-2 text-xs text-slate-600"
-                        >
-                          <span className="text-green-600">✓</span>
-                          {reason}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
+
             </div>
           </div>
 

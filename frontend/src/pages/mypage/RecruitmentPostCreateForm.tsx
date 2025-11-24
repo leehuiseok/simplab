@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiGet, apiPost, apiPut } from "../../shared/api";
@@ -353,7 +353,7 @@ const RecruitmentPostCreateForm = () => {
           "/api/teams",
           {
             name: formData.post_title || "새 팀",
-            region: selectedTeam?.region || null,
+            region: null, // 새 팀 생성 시 region은 나중에 설정
             area: formData.category || null,
             description:
               `${formData.post_title}\n\n${contestData.description}\n\n${projectData.problem}` ||
