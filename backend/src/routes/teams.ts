@@ -137,7 +137,7 @@ router.get(
     const total = (countResult as any[])[0].total;
 
     // 팀 목록 조회
-    const teamsQuery = `SELECT DISTINCT t.id, t.name, t.region, t.area, t.description, t.purpose, t.seeking_members, t.current_team_composition, t.ideal_candidate, t.collaboration_style, t.collaboration_tools, t.max_members, t.current_members, t.deadline, t.project_title, t.image_url, t.created_by, t.created_at, t.updated_at 
+    const teamsQuery = `SELECT DISTINCT t.id, t.name, t.region, t.area, t.description, t.purpose, t.seeking_members, t.current_team_composition, t.ideal_candidate, t.collaboration_style, t.collaboration_tools, t.max_members, (SELECT COUNT(*) FROM team_members tm_count WHERE tm_count.team_id = t.id AND tm_count.status = 'accepted') as current_members, t.deadline, t.project_title, t.image_url, t.created_by, t.created_at, t.updated_at 
      FROM teams t ${traitJoinClause} 
      ${whereClause} ${traitWhereClause} 
      ORDER BY t.created_at DESC 
@@ -170,7 +170,7 @@ router.get(
 
     // 사용자가 속한 팀 목록 조회
     const [teams] = await pool.execute(
-      `SELECT t.id, t.name, t.description, t.current_members, t.max_members, t.created_at, t.updated_at
+      `SELECT t.id, t.name, t.description, (SELECT COUNT(*) FROM team_members tm_count WHERE tm_count.team_id = t.id AND tm_count.status = 'accepted') as current_members, t.max_members, t.created_at, t.updated_at
        FROM teams t
        JOIN team_members tm ON t.id = tm.team_id
        WHERE tm.user_id = ? AND tm.status = 'accepted'
@@ -198,7 +198,7 @@ router.get(
 
     // 사용자가 만든 팀 목록 조회
     const [teams] = await pool.execute(
-      `SELECT id, name, region, area, description, purpose, seeking_members, current_team_composition, ideal_candidate, collaboration_style, max_members, current_members, deadline, project_title, image_url, created_by, created_at, updated_at
+      `SELECT id, name, region, area, description, purpose, seeking_members, current_team_composition, ideal_candidate, collaboration_style, max_members, (SELECT COUNT(*) FROM team_members tm_count WHERE tm_count.team_id = teams.id AND tm_count.status = 'accepted') as current_members, deadline, project_title, image_url, created_by, created_at, updated_at
        FROM teams
        WHERE created_by = ?
        ORDER BY created_at DESC`,
@@ -239,6 +239,14 @@ router.get(
      WHERE tm.team_id = ?`,
       [id]
     );
+
+    // 실제 수락된 멤버 수로 current_members 업데이트 (데이터 불일치 방지)
+    if (team && Array.isArray(members)) {
+      const acceptedMembersCount = members.filter(
+        (m: any) => m.status === "accepted"
+      ).length;
+      team.current_members = acceptedMembersCount;
+    }
 
     // 팀이 연관된 공모전 조회
     const [teamContests] = await pool.execute(
@@ -492,7 +500,7 @@ router.post(
 
     // 팀 존재 확인
     const [existingTeams] = await pool.execute(
-      "SELECT id, max_members, current_members FROM teams WHERE id = ?",
+      "SELECT id, max_members, (SELECT COUNT(*) FROM team_members tm_count WHERE tm_count.team_id = teams.id AND tm_count.status = 'accepted') as current_members FROM teams WHERE id = ?",
       [id]
     );
 
@@ -958,6 +966,7 @@ router.post(
         recommendations,
       },
     });
+    return;
   })
 );
 

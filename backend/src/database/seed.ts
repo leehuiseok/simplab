@@ -8,6 +8,7 @@ const runSeed = async () => {
     console.log("🗑️ 기존 데이터를 삭제합니다...");
     await pool.execute("DELETE FROM favorites");
     await pool.execute("DELETE FROM nudges");
+    await pool.execute("DELETE FROM messages");
     await pool.execute("DELETE FROM team_contests");
     await pool.execute("DELETE FROM team_members");
     await pool.execute("DELETE FROM teams");

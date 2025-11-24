@@ -27,7 +27,25 @@ export const config = {
     origin:
       process.env.NODE_ENV === "production"
         ? ["https://yourdomain.com"]
-        : ["http://localhost:3000", "http://localhost:5173"],
+        : (
+            origin: string | undefined,
+            callback: (err: Error | null, allow?: boolean) => void
+          ) => {
+            // 개발 환경: localhost와 ngrok 도메인 허용
+            if (!origin) {
+              return callback(null, true);
+            }
+            const allowedOrigins = [
+              /^http:\/\/localhost:\d+$/,
+              /^https:\/\/.*\.ngrok-free\.dev$/,
+              /^https:\/\/.*\.ngrok\.io$/,
+              /^https:\/\/.*\.ngrok-app\.com$/,
+            ];
+            const isAllowed = allowedOrigins.some((pattern) =>
+              pattern.test(origin)
+            );
+            callback(null, isAllowed);
+          },
     credentials: true,
   },
 };

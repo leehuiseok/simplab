@@ -3,6 +3,8 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
+import path from "path";
+import fs from "fs";
 
 import { config } from "./config/env";
 import { testConnection } from "./config/database";
@@ -23,8 +25,25 @@ dotenv.config();
 
 const app = express();
 
+// 프록시 신뢰 설정 (ngrok, load balancer 등 사용 시 필요)
+app.set("trust proxy", 1);
+
 // 보안 미들웨어
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:", "http:"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+        fontSrc: ["'self'", "data:", "https:"],
+        frameSrc: ["'self'", "https://www.figma.com", "https://*.figma.com"],
+        frameAncestors: ["'self'"],
+      },
+    },
+  })
+);
 
 // Rate limiting (개발 환경에서는 더 관대하게 설정)
 const limiter = rateLimit({
@@ -82,8 +101,67 @@ app.use("/api/messages", authenticateToken, messageRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/nudges", authenticateToken, nudgeRoutes);
 
-// 404 핸들러
-app.use(notFoundHandler);
+// 프론트엔드 정적 파일 서빙 (프론트엔드 빌드 파일이 있으면 서빙)
+// ts-node-dev로 실행 시 __dirname은 src 폴더이므로 ../../ 사용
+// 빌드된 코드 실행 시 __dirname은 dist 폴더이므로 ../../../ 사용
+const isCompiled = __dirname.includes("dist");
+const frontendDistPath = isCompiled
+  ? path.join(__dirname, "../../../frontend/dist")
+  : path.join(__dirname, "../../frontend/dist");
+
+// 프론트엔드 빌드 파일이 존재하는지 확인
+const frontendExists =
+  fs.existsSync(frontendDistPath) &&
+  fs.existsSync(path.join(frontendDistPath, "index.html"));
+
+if (frontendExists) {
+  // 프론트엔드 정적 파일 서빙 (이미지, CSS, JS 등)
+  // maxAge: 1년 캐시 (프로덕션 최적화)
+  app.use(
+    express.static(frontendDistPath, {
+      maxAge: config.nodeEnv === "production" ? "1y" : "0",
+      etag: true,
+      lastModified: true,
+    })
+  );
+
+  // 루트 경로 처리
+  app.get("/", (req, res) => {
+    res.sendFile(path.join(frontendDistPath, "index.html"));
+  });
+
+  // React Router를 위한 fallback: 모든 라우트를 index.html로
+  // express.static이 파일을 찾지 못한 경우에만 실행됨
+  app.get("*", (req, res, next) => {
+    // API 경로는 제외 (에러 핸들러로 넘김)
+    if (req.path.startsWith("/api") || req.path === "/health") {
+      return next();
+    }
+
+    // 확장자가 있는 파일 요청은 404 처리 (express.static에서 찾지 못했으면)
+    const hasExtension = /\.\w+$/.test(req.path.split("?")[0]);
+    if (hasExtension) {
+      return notFoundHandler(req, res);
+    }
+
+    // 그 외의 모든 경로는 React Router로 처리
+    res.sendFile(path.join(frontendDistPath, "index.html"));
+  });
+} else {
+  // 프론트엔드 빌드 파일이 없으면 개발 모드 메시지 표시
+  app.get("/", (req, res) => {
+    res.json({
+      success: true,
+      message: "Simplab API 서버가 실행 중입니다.",
+      endpoints: {
+        health: "/health",
+        api: "/api",
+        docs: "프론트엔드 빌드가 필요합니다: cd frontend && npm run build",
+      },
+      environment: config.nodeEnv,
+    });
+  });
+}
 
 // 에러 핸들러
 app.use(errorHandler);

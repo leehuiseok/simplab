@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiGet, apiPost, apiPut, apiDelete } from "../../shared/api";
 
@@ -17,6 +17,45 @@ type Team = {
   collaboration_style?: string;
   collaboration_tools?: string;
   created_by?: string;
+  max_members?: number;
+  deadline?: string;
+  project_title?: string;
+};
+
+type TeamPayload = {
+  name: string | null;
+  region: string | null;
+  area: string | null;
+  description: string | null;
+  image_url: string | null;
+  area_keywords: string | null;
+  progress_stage: string | null;
+  meeting_schedule: string | null;
+  available_time_slots: string | null;
+  collaboration_style: string | null;
+  collaboration_tools: string | null;
+  max_members: number;
+  deadline: string | null;
+  project_title: string | null;
+};
+
+const toNullable = (value?: string | null) => {
+  if (value === undefined) {
+    return null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  return value;
+};
+
+const ensureNoUndefined = <T extends Record<string, unknown>>(obj: T) => {
+  const entries = Object.entries(obj).map(([key, value]) => [
+    key,
+    value === undefined ? null : value,
+  ]);
+  return Object.fromEntries(entries) as T;
 };
 
 type TeamProject = {
@@ -37,13 +76,14 @@ type TeamProject = {
 
 const TeamRegistrationManageContent = () => {
   const { token } = useAuth();
-  const navigate = useNavigate();
+
   const [myTeams, setMyTeams] = useState<Team[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [projects, setProjects] = useState<TeamProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   // 폼 상태
   const [formData, setFormData] = useState({
@@ -58,6 +98,9 @@ const TeamRegistrationManageContent = () => {
     available_time_slots: "",
     collaboration_style: "",
     collaboration_tools: "",
+    max_members: "6",
+    deadline: "",
+    project_title: "",
   });
 
   // 프로젝트 폼 상태
@@ -93,7 +136,7 @@ const TeamRegistrationManageContent = () => {
       });
 
       setMyTeams(response.data.teams);
-      if (response.data.teams.length > 0 && !selectedTeamId) {
+      if (response.data.teams.length > 0 && !selectedTeamId && !isCreating) {
         setSelectedTeamId(response.data.teams[0].id);
       }
     } catch (error) {
@@ -102,7 +145,7 @@ const TeamRegistrationManageContent = () => {
     } finally {
       setLoading(false);
     }
-  }, [token, selectedTeamId]);
+  }, [token, selectedTeamId, isCreating]);
 
   // 선택한 팀의 상세 정보 조회
   const fetchTeamDetail = useCallback(async () => {
@@ -132,6 +175,9 @@ const TeamRegistrationManageContent = () => {
         available_time_slots: team.available_time_slots || "",
         collaboration_style: team.collaboration_style || "",
         collaboration_tools: team.collaboration_tools || "",
+        max_members: team.max_members?.toString() || "6",
+        deadline: team.deadline || "",
+        project_title: team.project_title || "",
       });
     } catch (error) {
       console.error("팀 상세 정보 조회 실패:", error);
@@ -164,48 +210,98 @@ const TeamRegistrationManageContent = () => {
 
   useEffect(() => {
     if (selectedTeamId) {
+      setIsCreating(false);
       fetchTeamDetail();
       fetchProjects();
     }
   }, [selectedTeamId, fetchTeamDetail, fetchProjects]);
 
+  const handleCreateTeamClick = () => {
+    setIsCreating(true);
+    setSelectedTeamId("");
+    setSelectedTeam(null);
+    setProjects([]);
+    setFormData({
+      name: "",
+      region: "",
+      area: "",
+      description: "",
+      image_url: "",
+      area_keywords: "",
+      progress_stage: "",
+      meeting_schedule: "",
+      available_time_slots: "",
+      collaboration_style: "",
+      collaboration_tools: "",
+      max_members: "6",
+      deadline: "",
+      project_title: "",
+    });
+  };
+
   // 팀 프로필 저장
   const handleSaveTeamProfile = async () => {
-    if (!token || !selectedTeamId) return;
+    if (!token) return;
+    if (!isCreating && !selectedTeamId) return;
+
+    if (!formData.name.trim()) {
+      alert("팀 이름을 입력해주세요.");
+      return;
+    }
 
     setSaving(true);
     try {
       // area_keywords를 배열에서 문자열로 변환 (이미 문자열이면 그대로 사용)
       const areaKeywordsStr = Array.isArray(formData.area_keywords)
         ? JSON.stringify(formData.area_keywords)
-        : formData.area_keywords || null;
+        : toNullable(formData.area_keywords);
 
       // available_time_slots를 배열에서 문자열로 변환
       const availableTimeSlotsStr = Array.isArray(formData.available_time_slots)
         ? JSON.stringify(formData.available_time_slots)
-        : formData.available_time_slots || null;
+        : toNullable(formData.available_time_slots);
 
       // undefined 값을 null로 변환
-      const payload: Record<string, any> = {
-        name: formData.name || null,
-        region: formData.region || null,
-        area: formData.area || null,
-        description: formData.description || null,
-        image_url: formData.image_url || null,
+      const payload = ensureNoUndefined<TeamPayload>({
+        name: formData.name.trim(),
+        region: toNullable(formData.region),
+        area: toNullable(formData.area),
+        description: toNullable(formData.description),
+        image_url: toNullable(formData.image_url),
         area_keywords: areaKeywordsStr,
-        progress_stage: formData.progress_stage || null,
-        meeting_schedule: formData.meeting_schedule || null,
+        progress_stage: toNullable(formData.progress_stage),
+        meeting_schedule: toNullable(formData.meeting_schedule),
         available_time_slots: availableTimeSlotsStr,
-        collaboration_style: formData.collaboration_style || null,
-        collaboration_tools: formData.collaboration_tools || null,
-      };
-
-      await apiPut(`/api/teams/${selectedTeamId}`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
+        collaboration_style: toNullable(formData.collaboration_style),
+        collaboration_tools: toNullable(formData.collaboration_tools),
+        max_members: Number(formData.max_members) || 6,
+        deadline: toNullable(formData.deadline),
+        project_title: toNullable(formData.project_title),
       });
 
-      alert("팀 프로필이 성공적으로 저장되었습니다!");
-      fetchTeamDetail();
+      if (isCreating) {
+        // 새 팀 생성
+        const response = await apiPost<{
+          success: boolean;
+          data: { team: Team };
+        }>("/api/teams", payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        alert("팀이 성공적으로 생성되었습니다!");
+        setIsCreating(false);
+        await fetchMyTeams();
+        // 새로 생성된 팀 선택
+        if (response.data.team) {
+          setSelectedTeamId(response.data.team.id);
+        }
+      } else {
+        // 기존 팀 수정
+        await apiPut(`/api/teams/${selectedTeamId}`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        alert("팀 프로필이 성공적으로 저장되었습니다!");
+        fetchTeamDetail();
+      }
     } catch (error) {
       console.error("팀 프로필 저장 실패:", error);
       alert("팀 프로필 저장에 실패했습니다.");
@@ -343,7 +439,7 @@ const TeamRegistrationManageContent = () => {
   };
 
   const handleRemoveAreaKeyword = (keyword: string) => {
-    const updated = areaKeywordsList.filter((k) => k !== keyword);
+    const updated = areaKeywordsList.filter((k: string) => k !== keyword);
     setFormData({
       ...formData,
       area_keywords: JSON.stringify(updated),
@@ -371,7 +467,7 @@ const TeamRegistrationManageContent = () => {
 
   const handleToggleTimeSlot = (slot: string) => {
     const updated = availableTimeSlotsList.includes(slot)
-      ? availableTimeSlotsList.filter((s) => s !== slot)
+      ? availableTimeSlotsList.filter((s: string) => s !== slot)
       : [...availableTimeSlotsList, slot];
     setFormData({
       ...formData,
@@ -416,7 +512,7 @@ const TeamRegistrationManageContent = () => {
     );
   }
 
-  if (myTeams.length === 0) {
+  if (myTeams.length === 0 && !isCreating) {
     return (
       <div className="flex-1">
         <div className="rounded-xl bg-slate-100 p-6">
@@ -431,7 +527,7 @@ const TeamRegistrationManageContent = () => {
             </div>
             <button
               type="button"
-              onClick={() => navigate("/mypage/posts/create")}
+              onClick={handleCreateTeamClick}
               className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
             >
               새 팀 등록
@@ -441,11 +537,9 @@ const TeamRegistrationManageContent = () => {
           <div className="text-center">
             <div className="rounded-xl border-2 border-dashed border-slate-300 p-8">
               <div className="text-slate-500">
-                <p className="text-lg">아직 속한 팀이 없습니다.</p>
-                <p className="mt-2 text-sm">새 팀을 만들어보세요.</p>
                 <button
                   type="button"
-                  onClick={() => navigate("/mypage/posts/create")}
+                  onClick={handleCreateTeamClick}
                   className="mt-4 inline-block rounded bg-slate-900 px-6 py-3 text-white hover:bg-slate-800"
                 >
                   팀 등록하기
@@ -471,7 +565,7 @@ const TeamRegistrationManageContent = () => {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => navigate("/mypage/posts/create")}
+              onClick={handleCreateTeamClick}
               className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
             >
               새 팀 등록
@@ -480,29 +574,52 @@ const TeamRegistrationManageContent = () => {
         </div>
 
         {/* 팀 선택 드롭다운 */}
-        <div className="mb-6">
-          <label className="mb-2 block text-sm font-medium text-slate-700">
-            팀 선택
-          </label>
-          <select
-            value={selectedTeamId}
-            onChange={(e) => setSelectedTeamId(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
-          >
-            {myTeams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {myTeams.length > 0 && !isCreating && (
+          <div className="mb-6">
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              팀 선택
+            </label>
+            <select
+              value={selectedTeamId}
+              onChange={(e) => setSelectedTeamId(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
+            >
+              {myTeams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
-        {selectedTeam && (
+        {isCreating && (
+          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-blue-900">
+                  새 팀 생성 중
+                </h3>
+                <p className="text-sm text-blue-700">
+                  새로운 팀의 기본 정보를 입력해주세요.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsCreating(false)}
+                className="rounded bg-white px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-50 border border-slate-200"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(selectedTeam || isCreating) && (
           <div className="space-y-6">
             {/* 팀 기본 정보 */}
             <div className="rounded-lg border border-slate-200 bg-white p-6">
               <h3 className="mb-4 text-lg font-bold text-slate-900">
-                팀 기본 정보
+                {isCreating ? "팀 기본 정보 입력" : "팀 기본 정보"}
               </h3>
 
               <div className="space-y-4">
@@ -634,312 +751,316 @@ const TeamRegistrationManageContent = () => {
               />
             </div>
 
-            {/* 프로젝트 관리 섹션 */}
-            <div className="rounded-lg border border-slate-200 bg-white p-6">
-              <h3 className="mb-4 text-lg font-bold text-slate-900">
-                진행중인/진행한 프로젝트 관리
-              </h3>
+            {/* 프로젝트 관리 섹션 (팀 생성 시에는 숨김) */}
+            {!isCreating && (
+              <div className="rounded-lg border border-slate-200 bg-white p-6">
+                <h3 className="mb-4 text-lg font-bold text-slate-900">
+                  진행중인/진행한 프로젝트 관리
+                </h3>
 
-              {/* 프로젝트 입력 폼 */}
-              <div className="mb-6 space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    프로젝트명 <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={projectForm.project_name}
-                    onChange={(e) =>
-                      setProjectForm({
-                        ...projectForm,
-                        project_name: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+                {/* 프로젝트 입력 폼 */}
+                <div className="mb-6 space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">
-                      시작일
+                      프로젝트명 <span className="text-red-500">*</span>
                     </label>
                     <input
-                      type="date"
-                      value={projectForm.start_date}
+                      type="text"
+                      value={projectForm.project_name}
                       onChange={(e) =>
                         setProjectForm({
                           ...projectForm,
-                          start_date: e.target.value,
+                          project_name: e.target.value,
                         })
                       }
                       className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
                     />
                   </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      종료일
-                    </label>
-                    <div className="flex gap-2">
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-700">
+                        시작일
+                      </label>
                       <input
                         type="date"
-                        value={projectForm.end_date}
+                        value={projectForm.start_date}
                         onChange={(e) =>
                           setProjectForm({
                             ...projectForm,
-                            end_date: e.target.value,
+                            start_date: e.target.value,
                           })
                         }
-                        disabled={projectForm.is_ongoing}
-                        className="flex-1 rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-100"
+                        className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
                       />
-                      <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-700">
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-700">
+                        종료일
+                      </label>
+                      <div className="flex gap-2">
                         <input
-                          type="checkbox"
-                          checked={projectForm.is_ongoing}
+                          type="date"
+                          value={projectForm.end_date}
                           onChange={(e) =>
                             setProjectForm({
                               ...projectForm,
-                              is_ongoing: e.target.checked,
+                              end_date: e.target.value,
                             })
                           }
-                          className="rounded"
+                          disabled={projectForm.is_ongoing}
+                          className="flex-1 rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-100"
                         />
-                        진행중
-                      </label>
+                        <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={projectForm.is_ongoing}
+                            onChange={(e) =>
+                              setProjectForm({
+                                ...projectForm,
+                                is_ongoing: e.target.checked,
+                              })
+                            }
+                            className="rounded"
+                          />
+                          진행중
+                        </label>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    활용 요약
-                  </label>
-                  <textarea
-                    value={projectForm.summary}
-                    onChange={(e) =>
-                      setProjectForm({
-                        ...projectForm,
-                        summary: e.target.value,
-                      })
-                    }
-                    placeholder="프로젝트의 활용 방법과 요약"
-                    rows={3}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    사용 기술 스택
-                  </label>
-                  <div className="mb-2 flex gap-2">
-                    <input
-                      ref={techStackInputRef}
-                      type="text"
-                      value={techStackInput}
-                      onChange={(e) => setTechStackInput(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleAddTechStack();
-                        }
-                      }}
-                      placeholder="기술 스택 입력 후 Enter"
-                      className="flex-1 rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddTechStack}
-                      className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-                    >
-                      추가
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {projectForm.tech_stack.map((tech) => (
-                      <span
-                        key={tech}
-                        className="flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-sm text-green-800"
-                      >
-                        {tech}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveTechStack(tech)}
-                          className="hover:text-green-600"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    결과물 링크
-                  </label>
-                  <input
-                    type="url"
-                    value={projectForm.result_link}
-                    onChange={(e) =>
-                      setProjectForm({
-                        ...projectForm,
-                        result_link: e.target.value,
-                      })
-                    }
-                    placeholder="https://..."
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    성과 지표
-                  </label>
-                  <textarea
-                    value={projectForm.performance_indicators}
-                    onChange={(e) =>
-                      setProjectForm({
-                        ...projectForm,
-                        performance_indicators: e.target.value,
-                      })
-                    }
-                    placeholder="성과 지표를 입력해주세요"
-                    rows={3}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    이미지 첨부
-                  </label>
-                  <input
-                    type="text"
-                    value={projectForm.images.join(", ")}
-                    onChange={(e) =>
-                      setProjectForm({
-                        ...projectForm,
-                        images: e.target.value
-                          .split(",")
-                          .map((s) => s.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                    placeholder="이미지 URL (쉼표로 구분)"
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                  />
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleSaveProject}
-                    disabled={saving}
-                    className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-                  >
-                    {editingProjectId ? "수정" : "저장"}
-                  </button>
-                  {editingProjectId && (
-                    <button
-                      type="button"
-                      onClick={() => {
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      활용 요약
+                    </label>
+                    <textarea
+                      value={projectForm.summary}
+                      onChange={(e) =>
                         setProjectForm({
-                          project_name: "",
-                          start_date: "",
-                          end_date: "",
-                          is_ongoing: false,
-                          summary: "",
-                          tech_stack: [],
-                          result_link: "",
-                          performance_indicators: "",
-                          images: [],
-                        });
-                        setEditingProjectId(null);
-                        setTechStackInput("");
-                      }}
-                      className="rounded bg-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-400"
-                    >
-                      취소
-                    </button>
-                  )}
-                </div>
-              </div>
+                          ...projectForm,
+                          summary: e.target.value,
+                        })
+                      }
+                      placeholder="프로젝트의 활용 방법과 요약"
+                      rows={3}
+                      className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    />
+                  </div>
 
-              {/* 프로젝트 리스트 */}
-              <div className="space-y-4">
-                {projects.map((project) => (
-                  <div
-                    key={project.id}
-                    className="rounded-lg border border-slate-200 bg-slate-50 p-4"
-                  >
-                    <div className="mb-2 flex items-start justify-between">
-                      <div>
-                        <h4 className="text-lg font-bold text-slate-900">
-                          {project.project_name}
-                        </h4>
-                        <p className="text-sm text-slate-600">
-                          {project.start_date && project.end_date
-                            ? `${project.start_date} ~ ${
-                                project.is_ongoing ? "진행중" : project.end_date
-                              }`
-                            : project.is_ongoing
-                            ? "진행중"
-                            : ""}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleEditProject(project)}
-                          className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
-                        >
-                          수정
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteProject(project.id)}
-                          className="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
-                        >
-                          삭제
-                        </button>
-                      </div>
-                    </div>
-
-                    {project.summary && (
-                      <p className="mb-2 text-sm text-slate-700">
-                        {project.summary}
-                      </p>
-                    )}
-
-                    {project.tech_stack && project.tech_stack.length > 0 && (
-                      <div className="mb-2 flex flex-wrap gap-2">
-                        {project.tech_stack.map((tech) => (
-                          <span
-                            key={tech}
-                            className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-800"
-                          >
-                            {tech}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {project.result_link && (
-                      <a
-                        href={project.result_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-600 hover:underline"
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      사용 기술 스택
+                    </label>
+                    <div className="mb-2 flex gap-2">
+                      <input
+                        ref={techStackInputRef}
+                        type="text"
+                        value={techStackInput}
+                        onChange={(e) => setTechStackInput(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddTechStack();
+                          }
+                        }}
+                        placeholder="기술 스택 입력 후 Enter"
+                        className="flex-1 rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddTechStack}
+                        className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
                       >
-                        결과물 보기 →
-                      </a>
+                        추가
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {projectForm.tech_stack.map((tech) => (
+                        <span
+                          key={tech}
+                          className="flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-sm text-green-800"
+                        >
+                          {tech}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTechStack(tech)}
+                            className="hover:text-green-600"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      결과물 링크
+                    </label>
+                    <input
+                      type="url"
+                      value={projectForm.result_link}
+                      onChange={(e) =>
+                        setProjectForm({
+                          ...projectForm,
+                          result_link: e.target.value,
+                        })
+                      }
+                      placeholder="https://..."
+                      className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      성과 지표
+                    </label>
+                    <textarea
+                      value={projectForm.performance_indicators}
+                      onChange={(e) =>
+                        setProjectForm({
+                          ...projectForm,
+                          performance_indicators: e.target.value,
+                        })
+                      }
+                      placeholder="성과 지표를 입력해주세요"
+                      rows={3}
+                      className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      이미지 첨부
+                    </label>
+                    <input
+                      type="text"
+                      value={projectForm.images.join(", ")}
+                      onChange={(e) =>
+                        setProjectForm({
+                          ...projectForm,
+                          images: e.target.value
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                      placeholder="이미지 URL (쉼표로 구분)"
+                      className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveProject}
+                      disabled={saving}
+                      className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      {editingProjectId ? "수정" : "저장"}
+                    </button>
+                    {editingProjectId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProjectForm({
+                            project_name: "",
+                            start_date: "",
+                            end_date: "",
+                            is_ongoing: false,
+                            summary: "",
+                            tech_stack: [],
+                            result_link: "",
+                            performance_indicators: "",
+                            images: [],
+                          });
+                          setEditingProjectId(null);
+                          setTechStackInput("");
+                        }}
+                        className="rounded bg-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-400"
+                      >
+                        취소
+                      </button>
                     )}
                   </div>
-                ))}
+                </div>
+
+                {/* 프로젝트 리스트 */}
+                <div className="space-y-4">
+                  {projects.map((project) => (
+                    <div
+                      key={project.id}
+                      className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="mb-2 flex items-start justify-between">
+                        <div>
+                          <h4 className="text-lg font-bold text-slate-900">
+                            {project.project_name}
+                          </h4>
+                          <p className="text-sm text-slate-600">
+                            {project.start_date && project.end_date
+                              ? `${project.start_date} ~ ${
+                                  project.is_ongoing
+                                    ? "진행중"
+                                    : project.end_date
+                                }`
+                              : project.is_ongoing
+                              ? "진행중"
+                              : ""}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleEditProject(project)}
+                            className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
+                          >
+                            수정
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteProject(project.id)}
+                            className="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+
+                      {project.summary && (
+                        <p className="mb-2 text-sm text-slate-700">
+                          {project.summary}
+                        </p>
+                      )}
+
+                      {project.tech_stack && project.tech_stack.length > 0 && (
+                        <div className="mb-2 flex flex-wrap gap-2">
+                          {project.tech_stack.map((tech) => (
+                            <span
+                              key={tech}
+                              className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-800"
+                            >
+                              {tech}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {project.result_link && (
+                        <a
+                          href={project.result_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline"
+                        >
+                          결과물 보기 →
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* 운영 정보 섹션 */}
             <div className="rounded-lg border border-slate-200 bg-white p-6">
@@ -1033,7 +1154,11 @@ const TeamRegistrationManageContent = () => {
                 disabled={saving}
                 className="rounded bg-slate-900 px-6 py-3 font-medium text-white hover:bg-slate-800 disabled:opacity-50"
               >
-                {saving ? "저장 중..." : "팀 프로필 저장"}
+                {saving
+                  ? "저장 중..."
+                  : isCreating
+                  ? "팀 생성하기"
+                  : "팀 프로필 저장"}
               </button>
             </div>
           </div>

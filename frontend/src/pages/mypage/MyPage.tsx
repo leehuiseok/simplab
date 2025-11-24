@@ -254,7 +254,8 @@ const FavoriteTeamCard = ({
   </div>
 );
 
-const TeamCard = ({
+// @ts-expect-error - 향후 사용 예정
+const _TeamCard = ({
   team,
   onDelete,
 }: {
@@ -496,7 +497,8 @@ const MemberCard = ({
   );
 };
 
-const TeamManageCard = ({
+// @ts-expect-error - 향후 사용 예정
+const _TeamManageCard = ({
   teamData,
   onMemberStatusChange,
   isLeader,
@@ -987,7 +989,7 @@ const AccountContent = () => {
       });
 
       // 직군 커스텀 모드 설정
-      setIsJobFieldCustom(isCustomJobField);
+      setIsJobFieldCustom(Boolean(isCustomJobField));
       if (isCustomJobField) {
         setJobFieldInput(userJobField);
       }
@@ -1611,7 +1613,6 @@ const AccountContent = () => {
   );
 };
 
-
 type Nudge = {
   id: string;
   from_user_id: string;
@@ -1633,9 +1634,13 @@ const TeamManageContent = () => {
   const navigate = useNavigate();
   const [myTeams, setMyTeams] = useState<Team[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
-  const [selectedTeam, setSelectedTeam] = useState<TeamWithMembers | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<TeamWithMembers | null>(
+    null
+  );
   const [selectedTeamNudges, setSelectedTeamNudges] = useState<Nudge[]>([]);
-  const [statusFilter, setStatusFilter] = useState<"all" | "accepted" | "pending" | "invited">("all");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "accepted" | "pending" | "invited"
+  >("all");
   const [loading, setLoading] = useState(true);
   const [showReview, setShowReview] = useState(false);
   const [reviewState, setReviewState] = useState<
@@ -1846,8 +1851,10 @@ const TeamManageContent = () => {
   }
 
   const isLeader = selectedTeam?.team.created_by === user?.id;
-  const acceptedMembers = selectedTeam?.members.filter((m) => m.status === "accepted") || [];
-  const pendingMembers = selectedTeam?.members.filter((m) => m.status === "pending") || [];
+  const acceptedMembers =
+    selectedTeam?.members.filter((m) => m.status === "accepted") || [];
+  const pendingMembers =
+    selectedTeam?.members.filter((m) => m.status === "pending") || [];
 
   return (
     <div className="flex-1">
@@ -2287,7 +2294,10 @@ const TeamManageContent = () => {
               </div>
               <div className="space-y-3 max-h-[60vh] overflow-auto pr-2">
                 {acceptedMembers.map((m) => (
-                  <div key={m.id} className="rounded border border-slate-200 p-3">
+                  <div
+                    key={m.id}
+                    className="rounded border border-slate-200 p-3"
+                  >
                     <div className="mb-2 text-sm font-medium text-slate-900">
                       {m.name}
                     </div>
@@ -2355,12 +2365,16 @@ const TeamManageContent = () => {
                       })),
                     };
                     try {
-                      await apiPost(`/api/teams/${selectedTeamId}/reviews`, payload, {
-                        headers: {
-                          Authorization: `Bearer ${token}`,
-                          "Content-Type": "application/json",
-                        },
-                      });
+                      await apiPost(
+                        `/api/teams/${selectedTeamId}/reviews`,
+                        payload,
+                        {
+                          headers: {
+                            Authorization: `Bearer ${token}`,
+                            "Content-Type": "application/json",
+                          },
+                        }
+                      );
                       alert("리뷰가 저장되었습니다. 수고하셨습니다!");
                       setShowReview(false);
                       setReviewState({});
@@ -2382,7 +2396,8 @@ const TeamManageContent = () => {
   );
 };
 
-const TeamCreateForm = () => {
+// @ts-expect-error - 향후 사용 예정
+const _TeamCreateForm = () => {
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -2667,7 +2682,8 @@ const MyPage = () => {
     if (pathname === "/mypage/favorites") return <FavoritesContent />;
     if (pathname === "/mypage/profile") return <ProfileForm />;
     if (pathname === "/mypage/posts") return <RecruitmentPostManageContent />;
-    if (pathname === "/mypage/posts/create") return <RecruitmentPostCreateForm />;
+    if (pathname === "/mypage/posts/create")
+      return <RecruitmentPostCreateForm />;
     if (pathname === "/mypage/team-registration")
       return <TeamRegistrationManageContent />;
     if (pathname === "/mypage/manage") return <TeamManageContent />;

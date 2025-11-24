@@ -95,7 +95,7 @@ const ContestCard = ({
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
       // 디버깅 로그 (개발 환경에서만)
-      if (process.env.NODE_ENV === "development") {
+      if (import.meta.env.MODE === "development") {
         console.log("날짜 계산:", {
           deadline,
           deadlineDate: deadlineStart.toISOString().split("T")[0],
@@ -120,7 +120,7 @@ const ContestCard = ({
     }
   };
 
-  const deadlineDisplay = getDeadlineDisplay(c.deadline);
+  const deadlineDisplay = getDeadlineDisplay(c.deadline ?? null);
 
   const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault();

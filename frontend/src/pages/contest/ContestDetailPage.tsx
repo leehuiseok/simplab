@@ -40,7 +40,7 @@ const ContestDetailPage = () => {
   const navigate = useNavigate();
   const [sending, setSending] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
+  // const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [contest, setContest] = useState<Contest | null>(null);
   const [recommendedUsers, setRecommendedUsers] = useState<RecommendedUser[]>(
     []
@@ -165,17 +165,15 @@ const ContestDetailPage = () => {
       <div className="flex flex-col">
         <Link
           to={`/profile/${user.id}`}
-          className={`flex flex-col items-center rounded-xl border-2 px-4 py-4 cursor-pointer transition-all hover:border-blue-400 ${
-            selectedTargetId === user.id
-              ? "border-blue-500 bg-blue-50"
-              : "border-slate-200"
-          }`}
+          className="flex flex-col items-center rounded-xl border-2 px-4 py-4 cursor-pointer transition-all hover:border-blue-400 border-slate-200"
         >
           <div className="h-20 w-20 rounded-full bg-slate-200 flex items-center justify-center text-lg font-semibold text-slate-600">
             {user.name.charAt(0)}
           </div>
           <div className="mt-2 text-center">
-            <div className="text-sm font-medium text-slate-900">{user.name}</div>
+            <div className="text-sm font-medium text-slate-900">
+              {user.name}
+            </div>
             <div className="text-xs text-slate-500">
               {user.job_field || "직군 미설정"}
             </div>
@@ -231,7 +229,8 @@ const ContestDetailPage = () => {
               }, 1500);
             } catch (error: any) {
               const errorMessage =
-                error.message || "전송에 실패했어요. 잠시 후 다시 시도해주세요.";
+                error.message ||
+                "전송에 실패했어요. 잠시 후 다시 시도해주세요.";
               setToast(errorMessage);
             } finally {
               setSending(false);
@@ -263,12 +262,18 @@ const ContestDetailPage = () => {
 
   const parseFeatures = (features: string | null | undefined): string[] => {
     if (!features) return [];
-    return features.split(",").map((f) => f.trim()).filter((f) => f.length > 0);
+    return features
+      .split(",")
+      .map((f) => f.trim())
+      .filter((f) => f.length > 0);
   };
 
   const parseRequiredSkills = (skills: string | null | undefined): string[] => {
     if (!skills) return [];
-    return skills.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+    return skills
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
   };
 
   return (
@@ -314,19 +319,25 @@ const ContestDetailPage = () => {
               <h3 className="text-sm font-semibold text-slate-700 mb-1">
                 대회명
               </h3>
-              <p className="text-base text-slate-900">{contest?.title ?? "-"}</p>
+              <p className="text-base text-slate-900">
+                {contest?.title ?? "-"}
+              </p>
             </div>
             <div>
               <h3 className="text-sm font-semibold text-slate-700 mb-1">
                 주제
               </h3>
-              <p className="text-base text-slate-900">{contest?.topic ?? "-"}</p>
+              <p className="text-base text-slate-900">
+                {contest?.topic ?? "-"}
+              </p>
             </div>
             <div>
               <h3 className="text-sm font-semibold text-slate-700 mb-1">
                 지역
               </h3>
-              <p className="text-base text-slate-900">{contest?.region ?? "-"}</p>
+              <p className="text-base text-slate-900">
+                {contest?.region ?? "-"}
+              </p>
             </div>
             <div>
               <h3 className="text-sm font-semibold text-slate-700 mb-1">
@@ -357,7 +368,9 @@ const ContestDetailPage = () => {
               <h3 className="text-sm font-semibold text-slate-700 mb-1">
                 대회 유형
               </h3>
-              <p className="text-base text-slate-900">{contest?.format ?? "-"}</p>
+              <p className="text-base text-slate-900">
+                {contest?.format ?? "-"}
+              </p>
             </div>
             <div>
               <h3 className="text-sm font-semibold text-slate-700 mb-1">
@@ -389,7 +402,9 @@ const ContestDetailPage = () => {
 
         {/* 필요한 역량 */}
         <section className="mb-12 rounded-lg border border-slate-200 p-6">
-          <h2 className="text-2xl font-bold text-slate-900 mb-6">필요한 역량</h2>
+          <h2 className="text-2xl font-bold text-slate-900 mb-6">
+            필요한 역량
+          </h2>
           <div className="space-y-6">
             <div>
               <h3 className="text-lg font-semibold text-slate-800 mb-3">
@@ -484,14 +499,24 @@ const ContestDetailPage = () => {
                   </span>
                 </label>
                 <label className="flex items-center cursor-pointer">
-                  <input type="radio" name="difficulty" value="intermediate" className="mr-2" />
+                  <input
+                    type="radio"
+                    name="difficulty"
+                    value="intermediate"
+                    className="mr-2"
+                  />
                   <span className="text-sm text-slate-700">중급</span>
                   <span className="ml-2 text-xs text-slate-500">
                     (기획 + 간단 구현 필요)
                   </span>
                 </label>
                 <label className="flex items-center cursor-pointer">
-                  <input type="radio" name="difficulty" value="advanced" className="mr-2" />
+                  <input
+                    type="radio"
+                    name="difficulty"
+                    value="advanced"
+                    className="mr-2"
+                  />
                   <span className="text-sm text-slate-700">고급</span>
                   <span className="ml-2 text-xs text-slate-500">
                     (실제 서비스 수준의 프로토타입 요구)
@@ -504,7 +529,9 @@ const ContestDetailPage = () => {
 
         {/* 팀 구성 추천 */}
         <section className="mb-12 rounded-lg border border-slate-200 p-6">
-          <h2 className="text-2xl font-bold text-slate-900 mb-6">팀 구성 추천</h2>
+          <h2 className="text-2xl font-bold text-slate-900 mb-6">
+            팀 구성 추천
+          </h2>
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-semibold text-slate-800 mb-2">

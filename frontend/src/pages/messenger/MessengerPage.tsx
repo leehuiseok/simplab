@@ -73,6 +73,24 @@ const MessengerPage = () => {
   // 공통 상태
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const activeDirectConversation = activeDirectUserId
+    ? directConversations.find(
+        (conversation) => conversation.other_user_id === activeDirectUserId
+      )
+    : null;
+
+  const isDirectViewActive =
+    (category === "all" || category === "direct") && !!activeDirectUserId;
+
+  const isTeamViewActive =
+    !isDirectViewActive &&
+    ((category === "all" && !!activeTeamId) || category === "team");
+
+  const handleRefresh = () => {
+    setRefreshKey((prev) => prev + 1);
+  };
 
   // 메시지 스크롤 최하단으로
   useEffect(() => {
@@ -142,7 +160,7 @@ const MessengerPage = () => {
         console.error("1대1 메시지 로드 실패:", error);
       }
     })();
-  }, [activeDirectUserId, token]);
+  }, [activeDirectUserId, token, refreshKey]);
 
   // 팀 채팅 메시지 로드
   useEffect(() => {
@@ -160,24 +178,51 @@ const MessengerPage = () => {
         console.error("팀 메시지 로드 실패:", error);
       }
     })();
-  }, [activeTeamId, token]);
+  }, [activeTeamId, token, refreshKey]);
 
   const sendDirectMessage = async () => {
     if (!user || !token || !activeDirectUserId || !input.trim()) return;
+
+    const currentInput = input;
+    const tempId = `temp-direct-${Date.now()}-${Math.random()}`;
+    const tempMessage: DirectMessage = {
+      id: tempId,
+      sender_id: user.id,
+      receiver_id: activeDirectUserId,
+      content: currentInput,
+      created_at: new Date().toISOString(),
+      sender_name: user.name,
+      receiver_name: activeDirectConversation?.other_user_name ?? "",
+      message_type: "text",
+      is_read: false,
+    };
+
+    setDirectMessages((prev) => [...prev, tempMessage]);
+    setInput("");
     setLoading(true);
+
     try {
       const data = await apiPost<{ data: { message: DirectMessage } }>(
         `/api/messages/direct`,
         {
           receiver_id: activeDirectUserId,
-          content: input,
+          content: currentInput,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      setDirectMessages((prev) => [...prev, data.data.message]);
-      setInput("");
+      setDirectMessages((prev) =>
+        prev.map((message) =>
+          message.id === tempId ? data.data.message : message
+        )
+      );
+    } catch (error) {
+      console.error("1대1 메시지 전송 실패:", error);
+      setDirectMessages((prev) =>
+        prev.filter((message) => message.id !== tempId)
+      );
+      setInput(currentInput);
     } finally {
       setLoading(false);
     }
@@ -185,19 +230,42 @@ const MessengerPage = () => {
 
   const sendTeamMessage = async () => {
     if (!user || !token || !activeTeamId || !input.trim()) return;
+
+    const currentInput = input;
+    const tempId = `temp-team-${Date.now()}-${Math.random()}`;
+    const tempMessage: TeamMessage = {
+      id: tempId,
+      sender_id: user.id,
+      content: currentInput,
+      created_at: new Date().toISOString(),
+      sender_name: user.name,
+    };
+
+    setTeamMessages((prev) => [...prev, tempMessage]);
+    setInput("");
     setLoading(true);
+
     try {
       const data = await apiPost<{ data: { message: TeamMessage } }>(
         `/api/messages/team/${activeTeamId}`,
         {
-          content: input,
+          content: currentInput,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      setTeamMessages((prev) => [...prev, data.data.message]);
-      setInput("");
+      setTeamMessages((prev) =>
+        prev.map((message) =>
+          message.id === tempId ? data.data.message : message
+        )
+      );
+    } catch (error) {
+      console.error("팀 메시지 전송 실패:", error);
+      setTeamMessages((prev) =>
+        prev.filter((message) => message.id !== tempId)
+      );
+      setInput(currentInput);
     } finally {
       setLoading(false);
     }
@@ -208,6 +276,10 @@ const MessengerPage = () => {
     const date = new Date(dateString);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
+
+    // 미래 시간인 경우 (서버 시간이 더 빠르거나 시간대 문제) 방금 전으로 표시
+    if (diff < 0) return "방금 전";
+
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
@@ -247,6 +319,13 @@ const MessengerPage = () => {
       (sum, conv) => sum + (conv.unread_count || 0),
       0
     ) + 0; // 팀 메시지 안읽음 카운트는 추후 추가
+
+  const isSendDisabled =
+    loading ||
+    !input.trim() ||
+    (!isDirectViewActive && !isTeamViewActive) ||
+    (isDirectViewActive && !activeDirectUserId) ||
+    (isTeamViewActive && !activeTeamId);
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -421,102 +500,178 @@ const MessengerPage = () => {
           {/* 우측 메인 패널 - 대화 내역 */}
           <main className="lg:col-span-4">
             <div className="flex flex-col h-[70vh] rounded-lg border border-slate-200">
+              {/* 채팅 헤더 */}
+              <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-lg">
+                <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+                  {(category === "all" || category === "direct") &&
+                  activeDirectUserId ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                      {
+                        directConversations.find(
+                          (c) => c.other_user_id === activeDirectUserId
+                        )?.other_user_name
+                      }
+                    </>
+                  ) : (category === "all" || category === "team") &&
+                    activeTeamId ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                      {teams.find((t) => t.id === activeTeamId)?.name}
+                    </>
+                  ) : (
+                    "채팅을 선택하세요"
+                  )}
+                </h2>
+                <button
+                  onClick={handleRefresh}
+                  className="p-2 rounded-full hover:bg-slate-200 text-slate-500 transition-colors"
+                  title="새로고침"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                </button>
+              </div>
               {/* 채팅 영역 */}
               <div className="flex-1 p-4 overflow-y-auto">
                 {(category === "all" || category === "direct") &&
-                activeDirectUserId &&
-                directMessages.length > 0 ? (
-                  // 1대1 채팅 메시지
-                  directMessages.map((message) => {
-                    const isOwnMessage = message.sender_id === user?.id;
+                activeDirectUserId ? (
+                  directMessages.length > 0 ? (
+                    // 1대1 채팅 메시지
+                    directMessages.map((message) => {
+                      const isOwnMessage = message.sender_id === user?.id;
 
-                    return (
-                      <div
-                        key={message.id}
-                        className={`mb-4 flex ${
-                          isOwnMessage ? "justify-end" : "justify-start"
-                        }`}
-                      >
+                      return (
                         <div
-                          className={`flex items-end gap-2 max-w-[70%] ${
-                            isOwnMessage ? "flex-row-reverse" : "flex-row"
+                          key={message.id}
+                          className={`mb-4 flex ${
+                            isOwnMessage ? "justify-end" : "justify-start"
                           }`}
                         >
-                          {/* 프로필 이미지 (받은 메시지만) */}
-                          {!isOwnMessage && (
-                            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-semibold text-xs flex-shrink-0">
-                              {message.sender_name.charAt(0)}
-                            </div>
-                          )}
-
-                          {/* 메시지 버블 */}
-                          <div className="flex flex-col">
+                          <div
+                            className={`flex items-end gap-2 max-w-[70%] ${
+                              isOwnMessage ? "flex-row-reverse" : "flex-row"
+                            }`}
+                          >
+                            {/* 프로필 이미지 (받은 메시지만) */}
                             {!isOwnMessage && (
-                              <div className="text-xs text-slate-500 mb-1 px-1">
-                                {message.sender_name}
+                              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-semibold text-xs flex-shrink-0">
+                                {message.sender_name.charAt(0)}
                               </div>
                             )}
-                            <div
-                              className={`rounded-lg px-4 py-2 text-sm ${
-                                isOwnMessage
-                                  ? "bg-slate-900 text-white"
-                                  : "bg-slate-100 text-slate-900"
-                              }`}
-                            >
-                              {message.content}
-                            </div>
-                            <div
-                              className={`text-xs text-slate-400 mt-1 px-1 flex items-center gap-1 ${
-                                isOwnMessage ? "justify-end" : "justify-start"
-                              }`}
-                            >
-                              {formatTime(message.created_at)}
-                              {isOwnMessage && message.is_read && (
-                                <span className="text-green-500">✓ 읽음</span>
+
+                            {/* 메시지 버블 */}
+                            <div className="flex flex-col">
+                              {!isOwnMessage && (
+                                <div className="text-xs text-slate-500 mb-1 px-1">
+                                  {message.sender_name}
+                                </div>
                               )}
-                              {isOwnMessage && !message.is_read && (
-                                <span className="text-slate-400">✓</span>
-                              )}
+                              <div
+                                className={`rounded-lg px-4 py-2 text-sm ${
+                                  isOwnMessage
+                                    ? "bg-slate-900 text-white"
+                                    : "bg-slate-100 text-slate-900"
+                                }`}
+                              >
+                                {message.content}
+                              </div>
+                              <div
+                                className={`text-xs text-slate-400 mt-1 px-1 flex items-center gap-1 ${
+                                  isOwnMessage ? "justify-end" : "justify-start"
+                                }`}
+                              >
+                                {formatTime(message.created_at)}
+                                {isOwnMessage && message.is_read && (
+                                  <span className="text-green-500">✓ 읽음</span>
+                                )}
+                                {isOwnMessage && !message.is_read && (
+                                  <span className="text-slate-400">✓</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })
+                      );
+                    })
+                  ) : (
+                    <div className="h-full grid place-items-center text-slate-500 text-sm">
+                      메시지가 없습니다.
+                    </div>
+                  )
                 ) : (category === "all" || category === "team") &&
-                  activeTeamId &&
+                  activeTeamId ? (
                   teamMessages.length > 0 ? (
-                  // 팀 채팅 메시지
-                  teamMessages.map((message) => {
-                    const isOwnMessage = message.sender_id === user?.id;
+                    // 팀 채팅 메시지
+                    teamMessages.map((message) => {
+                      const isOwnMessage = message.sender_id === user?.id;
 
-                    return (
-                      <div key={message.id} className="mb-4 flex justify-start">
-                        <div className="flex items-end gap-2 max-w-[70%] flex-row">
-                          {/* 프로필 이미지 */}
-                          <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-semibold text-xs flex-shrink-0">
-                            {message.sender_name.charAt(0)}
-                          </div>
+                      return (
+                        <div
+                          key={message.id}
+                          className={`mb-4 flex ${
+                            isOwnMessage ? "justify-end" : "justify-start"
+                          }`}
+                        >
+                          <div
+                            className={`flex items-end gap-2 max-w-[70%] ${
+                              isOwnMessage ? "flex-row-reverse" : "flex-row"
+                            }`}
+                          >
+                            {/* 프로필 이미지 (받은 메시지만) */}
+                            {!isOwnMessage && (
+                              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-semibold text-xs flex-shrink-0">
+                                {message.sender_name.charAt(0)}
+                              </div>
+                            )}
 
-                          {/* 메시지 버블 */}
-                          <div className="flex flex-col">
-                            <div className="text-xs text-slate-500 mb-1 px-1">
-                              {message.sender_name}
-                            </div>
-                            <div className="rounded-lg px-4 py-2 text-sm bg-slate-100 text-slate-900">
-                              {message.content}
-                            </div>
-                            <div className="text-xs text-slate-400 mt-1 px-1">
-                              {formatTime(message.created_at)}
+                            {/* 메시지 버블 */}
+                            <div className="flex flex-col">
+                              {!isOwnMessage && (
+                                <div className="text-xs text-slate-500 mb-1 px-1">
+                                  {message.sender_name}
+                                </div>
+                              )}
+                              <div
+                                className={`rounded-lg px-4 py-2 text-sm ${
+                                  isOwnMessage
+                                    ? "bg-slate-900 text-white"
+                                    : "bg-slate-100 text-slate-900"
+                                }`}
+                              >
+                                {message.content}
+                              </div>
+                              <div
+                                className={`text-xs text-slate-400 mt-1 px-1 flex items-center gap-1 ${
+                                  isOwnMessage ? "justify-end" : "justify-start"
+                                }`}
+                              >
+                                {formatTime(message.created_at)}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })
+                      );
+                    })
+                  ) : (
+                    <div className="h-full grid place-items-center text-slate-500 text-sm">
+                      메시지가 없습니다.
+                    </div>
+                  )
                 ) : (
                   <div className="h-full grid place-items-center text-slate-500 text-sm">
-                    메시지가 없습니다.
+                    채팅을 선택하세요.
                   </div>
                 )}
                 <div ref={messagesEndRef} />
@@ -554,9 +709,9 @@ const MessengerPage = () => {
                     onKeyPress={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
-                        if (category === "direct" || activeDirectUserId) {
+                        if (isDirectViewActive) {
                           sendDirectMessage();
-                        } else if (category === "team" || activeTeamId) {
+                        } else if (isTeamViewActive) {
                           sendTeamMessage();
                         }
                       }
@@ -566,17 +721,9 @@ const MessengerPage = () => {
                   {/* 전송 버튼 */}
                   <button
                     onClick={
-                      category === "direct" || activeDirectUserId
-                        ? sendDirectMessage
-                        : sendTeamMessage
+                      isDirectViewActive ? sendDirectMessage : sendTeamMessage
                     }
-                    disabled={
-                      loading ||
-                      !input.trim() ||
-                      (category === "direct" || activeDirectUserId
-                        ? !activeDirectUserId
-                        : !activeTeamId)
-                    }
+                    disabled={isSendDisabled}
                     className="rounded-md bg-slate-900 px-6 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     전송
