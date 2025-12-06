@@ -913,7 +913,7 @@ const AccountContent = () => {
     name: "",
     email: "",
     region: "",
-    district: "",
+
     school: "",
     status: "재학중",
     major: "",
@@ -978,7 +978,6 @@ const AccountContent = () => {
         name: user.name || "",
         email: user.email || "",
         region: user.region || "",
-        district: "", // 별도 필드가 없으므로 빈 문자열
         school: user.school || "",
         status: "재학중", // 별도 필드가 없으므로 기본값
         major: user.major || "",
@@ -1299,20 +1298,6 @@ const AccountContent = () => {
                   required
                   disabled={!isEditing}
                   placeholder="예: 서울특별시"
-                  className={getInputClassName()}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  지역 (시/군/구)
-                </label>
-                <input
-                  type="text"
-                  name="district"
-                  value={formData.district}
-                  onChange={handleInputChange}
-                  disabled={!isEditing}
-                  placeholder="예: 강남구"
                   className={getInputClassName()}
                 />
               </div>

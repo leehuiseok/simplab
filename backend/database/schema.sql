@@ -92,7 +92,10 @@ CREATE TABLE team_members (
     role VARCHAR(100),
     status ENUM('pending', 'accepted', 'rejected') DEFAULT 'pending',
     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_team_user (team_id, user_id)
+
+    UNIQUE KEY unique_team_user (team_id, user_id),
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- 관심사 테이블 (사용자 관심 공모전/팀)
@@ -124,7 +127,7 @@ CREATE TABLE awards (
     title VARCHAR(255) NOT NULL,
     awarded_at DATE NOT NULL,
     description TEXT,
-    rank VARCHAR(100) COMMENT '수상/등급 (대상, 최우수상, 우수상, 장려상, 입선, 기타)',
+    `rank` VARCHAR(100) COMMENT '수상/등급 (대상, 최우수상, 우수상, 장려상, 입선, 기타)',
     participation_type VARCHAR(100) COMMENT '참여 형태 (개인, 팀, 공모전, 연구, 과제, 기타)',
     roles TEXT COMMENT '내 역할 (JSON 배열 또는 콤마 구분)',
     result_link VARCHAR(500) COMMENT '결과물 링크',
@@ -186,22 +189,3 @@ CREATE TABLE nudges (
     CHECK ((contest_id IS NOT NULL AND team_id IS NULL) OR (contest_id IS NULL AND team_id IS NOT NULL))
 );
 
--- 인덱스 생성
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_contests_region ON contests(region);
-CREATE INDEX idx_contests_deadline ON contests(deadline);
-CREATE INDEX idx_teams_region ON teams(region);
-CREATE INDEX idx_teams_created_by ON teams(created_by);
-CREATE INDEX idx_team_members_team_id ON team_members(team_id);
-CREATE INDEX idx_team_members_user_id ON team_members(user_id);
-CREATE INDEX idx_favorites_user_id ON favorites(user_id);
-CREATE INDEX idx_messages_sender_id ON messages(sender_id);
-CREATE INDEX idx_messages_receiver_id ON messages(receiver_id);
-CREATE INDEX idx_messages_team_id ON messages(team_id);
-CREATE INDEX idx_awards_user_id ON awards(user_id);
-CREATE INDEX idx_user_traits_user_id ON user_traits(user_id);
-CREATE INDEX idx_nudges_from_user_id ON nudges(from_user_id);
-CREATE INDEX idx_nudges_to_user_id ON nudges(to_user_id);
-CREATE INDEX idx_nudges_contest_id ON nudges(contest_id);
-CREATE INDEX idx_nudges_team_id ON nudges(team_id);
-CREATE INDEX idx_team_projects_team_id ON team_projects(team_id);

@@ -119,33 +119,39 @@ const TeamRegistrationManageContent = () => {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const techStackInputRef = useRef<HTMLInputElement>(null);
   const [techStackInput, setTechStackInput] = useState("");
+  const isInitialLoad = useRef(true);
 
   // 사용자가 속한 모든 팀 목록 조회
-  const fetchMyTeams = useCallback(async () => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const response = await apiGet<{
-        success: boolean;
-        data: { teams: Team[] };
-      }>("/api/teams/my-teams", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setMyTeams(response.data.teams);
-      if (response.data.teams.length > 0 && !selectedTeamId && !isCreating) {
-        setSelectedTeamId(response.data.teams[0].id);
+  const fetchMyTeams = useCallback(
+    async (autoSelectFirst = false) => {
+      if (!token) {
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error("내가 속한 팀 목록 조회 실패:", error);
-      alert("팀 목록을 불러오는데 실패했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  }, [token, selectedTeamId, isCreating]);
+
+      try {
+        // 팀 등록 관리 페이지에서는 사용자가 만든 팀을 조회
+        const response = await apiGet<{
+          success: boolean;
+          data: { teams: Team[] };
+        }>("/api/teams/my-created-teams", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        setMyTeams(response.data.teams);
+        // autoSelectFirst가 true이거나 초기 로드 시에만 첫 번째 팀 선택
+        if (response.data.teams.length > 0 && autoSelectFirst) {
+          setSelectedTeamId(response.data.teams[0].id);
+        }
+      } catch (error) {
+        console.error("내가 속한 팀 목록 조회 실패:", error);
+        alert("팀 목록을 불러오는데 실패했습니다.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token]
+  );
 
   // 선택한 팀의 상세 정보 조회
   const fetchTeamDetail = useCallback(async () => {
@@ -205,7 +211,9 @@ const TeamRegistrationManageContent = () => {
   }, [token, selectedTeamId]);
 
   useEffect(() => {
-    fetchMyTeams();
+    // 초기 로드 시에만 자동으로 첫 번째 팀 선택
+    fetchMyTeams(isInitialLoad.current);
+    isInitialLoad.current = false;
   }, [fetchMyTeams]);
 
   useEffect(() => {
@@ -287,12 +295,20 @@ const TeamRegistrationManageContent = () => {
         }>("/api/teams", payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        alert("팀이 성공적으로 생성되었습니다!");
-        setIsCreating(false);
-        await fetchMyTeams();
-        // 새로 생성된 팀 선택
-        if (response.data.team) {
-          setSelectedTeamId(response.data.team.id);
+
+        if (response.data?.team?.id) {
+          const newTeamId = response.data.team.id;
+          setIsCreating(false);
+
+          // 팀 목록을 새로고침 (약간의 지연을 두어 DB 동기화 대기)
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          await fetchMyTeams();
+
+          // 새로 생성된 팀 선택
+          setSelectedTeamId(newTeamId);
+          alert("팀이 성공적으로 생성되었습니다!");
+        } else {
+          alert("팀 생성에 실패했습니다.");
         }
       } else {
         // 기존 팀 수정
