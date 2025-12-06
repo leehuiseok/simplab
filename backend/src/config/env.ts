@@ -33,8 +33,9 @@ export const config = {
                   domain.trim()
                 )
               : [];
-            // Cloudtype 도메인 패턴도 허용 (기본값)
+            // Cloudtype 및 Vercel 도메인 패턴도 허용 (기본값)
             const cloudtypePattern = /^https:\/\/.*\.cloudtype\.app$/;
+            const vercelPattern = /^https:\/\/.*\.vercel\.app$/;
             return (
               origin: string | undefined,
               callback: (err: Error | null, allow?: boolean) => void
@@ -42,10 +43,11 @@ export const config = {
               if (!origin) {
                 return callback(null, true);
               }
-              // 환경 변수에 명시된 도메인 또는 Cloudtype 도메인 허용
+              // 환경 변수에 명시된 도메인 또는 Cloudtype/Vercel 도메인 허용
               const isAllowed =
                 allowedDomains.includes(origin) ||
-                cloudtypePattern.test(origin);
+                cloudtypePattern.test(origin) ||
+                vercelPattern.test(origin);
               callback(null, isAllowed);
             };
           })()
