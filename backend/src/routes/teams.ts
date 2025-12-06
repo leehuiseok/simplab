@@ -157,7 +157,7 @@ router.get(
   })
 );
 
-// 사용자가 속한 팀 목록 조회 (채팅용)
+// 사용자가 속한 팀 목록 조회 (멤버로 속한 팀 + 팀장인 팀)
 router.get(
   "/my-teams",
   authenticateToken,
@@ -168,14 +168,16 @@ router.get(
       throw createError("로그인이 필요합니다", 401);
     }
 
-    // 사용자가 속한 팀 목록 조회
+    // 사용자가 속한 팀 목록 조회 (멤버로 속한 팀 또는 팀장인 팀)
     const [teams] = await pool.execute(
-      `SELECT t.id, t.name, t.description, (SELECT COUNT(*) FROM team_members tm_count WHERE tm_count.team_id = t.id AND tm_count.status = 'accepted') as current_members, t.max_members, t.created_at, t.updated_at
+      `SELECT DISTINCT t.id, t.name, t.region, t.area, t.description, 
+              (SELECT COUNT(*) FROM team_members tm_count WHERE tm_count.team_id = t.id AND tm_count.status = 'accepted') as current_members, 
+              t.max_members, t.created_at, t.updated_at
        FROM teams t
-       JOIN team_members tm ON t.id = tm.team_id
-       WHERE tm.user_id = ? AND tm.status = 'accepted'
+       LEFT JOIN team_members tm ON t.id = tm.team_id AND tm.user_id = ? AND tm.status = 'accepted'
+       WHERE (tm.user_id = ? AND tm.status = 'accepted') OR t.created_by = ?
        ORDER BY t.updated_at DESC`,
-      [userId]
+      [userId, userId, userId]
     );
 
     res.json({
@@ -315,10 +317,14 @@ router.post(
       throw createError("팀명은 필수입니다", 400);
     }
 
-    const [result] = await pool.execute(
-      `INSERT INTO teams (name, region, area, description, max_members, current_members, deadline, project_title, collaboration_style, collaboration_tools, created_by) 
-     VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+    // UUID 생성
+    const teamId = randomUUID();
+
+    await pool.execute(
+      `INSERT INTO teams (id, name, region, area, description, max_members, current_members, deadline, project_title, collaboration_style, collaboration_tools, created_by) 
+     VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
       [
+        teamId,
         name,
         region,
         area,
@@ -331,9 +337,6 @@ router.post(
         userId,
       ]
     );
-
-    const insertResult = result as any;
-    const teamId = insertResult.insertId;
 
     // 팀장을 멤버로 추가
     await pool.execute(
@@ -990,13 +993,17 @@ router.get(
           try {
             return {
               ...project,
-              tech_stack: project.tech_stack ? JSON.parse(project.tech_stack) : [],
+              tech_stack: project.tech_stack
+                ? JSON.parse(project.tech_stack)
+                : [],
               images: project.images ? JSON.parse(project.images) : [],
             };
           } catch {
             return {
               ...project,
-              tech_stack: project.tech_stack ? project.tech_stack.split(",") : [],
+              tech_stack: project.tech_stack
+                ? project.tech_stack.split(",")
+                : [],
               images: project.images ? project.images.split(",") : [],
             };
           }
@@ -1094,10 +1101,14 @@ router.post(
 
     if (project) {
       try {
-        project.tech_stack = project.tech_stack ? JSON.parse(project.tech_stack) : [];
+        project.tech_stack = project.tech_stack
+          ? JSON.parse(project.tech_stack)
+          : [];
         project.images = project.images ? JSON.parse(project.images) : [];
       } catch {
-        project.tech_stack = project.tech_stack ? project.tech_stack.split(",") : [];
+        project.tech_stack = project.tech_stack
+          ? project.tech_stack.split(",")
+          : [];
         project.images = project.images ? project.images.split(",") : [];
       }
     }
@@ -1188,10 +1199,14 @@ router.put(
 
     if (project) {
       try {
-        project.tech_stack = project.tech_stack ? JSON.parse(project.tech_stack) : [];
+        project.tech_stack = project.tech_stack
+          ? JSON.parse(project.tech_stack)
+          : [];
         project.images = project.images ? JSON.parse(project.images) : [];
       } catch {
-        project.tech_stack = project.tech_stack ? project.tech_stack.split(",") : [];
+        project.tech_stack = project.tech_stack
+          ? project.tech_stack.split(",")
+          : [];
         project.images = project.images ? project.images.split(",") : [];
       }
     }
@@ -1234,10 +1249,10 @@ router.delete(
       throw createError("프로젝트 삭제 권한이 없습니다", 403);
     }
 
-    await pool.execute("DELETE FROM team_projects WHERE id = ? AND team_id = ?", [
-      projectId,
-      id,
-    ]);
+    await pool.execute(
+      "DELETE FROM team_projects WHERE id = ? AND team_id = ?",
+      [projectId, id]
+    );
 
     res.json({
       success: true,

@@ -17,63 +17,83 @@ const runMigration = async () => {
     const schema = fs.readFileSync(schemaPath, "utf8");
 
     // SQL 문장들을 분리 (세미콜론으로 구분)
+    // 주석 줄만 제거하고, COMMENT 같은 SQL 키워드는 유지
     const statements = schema
       .split(";")
-      .map((stmt) => stmt.trim())
-      .filter((stmt) => stmt.length > 0 && !stmt.startsWith("--"));
+      .map((stmt) => {
+        // 줄 단위로 분리하여 주석 줄 제거
+        const lines = stmt.split("\n");
+        const filteredLines = lines.filter(
+          (line) => !line.trim().startsWith("--") && line.trim().length > 0
+        );
+        return filteredLines.join("\n").trim();
+      })
+      .filter((stmt) => stmt.length > 0);
 
     // CREATE TABLE 문장들을 먼저 실행
     const createTableStatements = statements.filter((stmt) =>
-      stmt.toUpperCase().startsWith("CREATE TABLE")
+      stmt.toUpperCase().includes("CREATE TABLE")
     );
 
-    // 인덱스 생성 문장들을 나중에 실행
-    const indexStatements = statements.filter((stmt) =>
-      stmt.toUpperCase().startsWith("CREATE INDEX")
+    console.log(
+      `📋 발견된 CREATE TABLE 문장: ${createTableStatements.length}개`
     );
 
     // 테이블 생성
     for (const statement of createTableStatements) {
       if (statement.trim()) {
         try {
+          // 테이블 이름 추출 (디버깅용)
+          const tableMatch = statement.match(/CREATE TABLE\s+(\w+)/i);
+          const tableName = tableMatch ? tableMatch[1] : "unknown";
+
           await pool.execute(statement);
-          console.log(
-            "✅ 테이블 생성 완료:",
-            statement.substring(0, 50) + "..."
-          );
+          console.log(`✅ 테이블 생성 완료: ${tableName}`);
         } catch (error: any) {
-          if (error.code === "ER_TABLE_EXISTS_ERROR") {
-            console.log(
-              "⚠️ 테이블이 이미 존재합니다:",
-              statement.substring(0, 50) + "..."
-            );
+          if (
+            error.code === "ER_TABLE_EXISTS_ERROR" ||
+            error.code === "ER_TABLE_EXISTS"
+          ) {
+            const tableMatch = statement.match(/CREATE TABLE\s+(\w+)/i);
+            const tableName = tableMatch ? tableMatch[1] : "unknown";
+            console.log(`⚠️ 테이블이 이미 존재합니다: ${tableName}`);
           } else {
+            console.error(`❌ 테이블 생성 실패:`, error.message);
             throw error;
           }
         }
       }
     }
 
-    // 인덱스 생성 (team_projects 인덱스는 나중에 생성)
-    for (const statement of indexStatements) {
+    // CREATE INDEX 문장들 실행
+    const createIndexStatements = statements.filter((stmt) =>
+      stmt.toUpperCase().includes("CREATE INDEX")
+    );
+
+    console.log(
+      `📋 발견된 CREATE INDEX 문장: ${createIndexStatements.length}개`
+    );
+
+    // 인덱스 생성
+    for (const statement of createIndexStatements) {
       if (statement.trim()) {
-        // team_projects 인덱스는 나중에 생성하므로 건너뜀
-        if (statement.includes("idx_team_projects")) {
-          continue;
-        }
         try {
+          // 인덱스 이름 추출 (디버깅용)
+          const indexMatch = statement.match(/CREATE INDEX\s+(\w+)/i);
+          const indexName = indexMatch ? indexMatch[1] : "unknown";
+
           await pool.execute(statement);
-          console.log(
-            "✅ 인덱스 생성 완료:",
-            statement.substring(0, 50) + "..."
-          );
+          console.log(`✅ 인덱스 생성 완료: ${indexName}`);
         } catch (error: any) {
-          if (error.code === "ER_DUP_KEYNAME") {
-            console.log(
-              "⚠️ 인덱스가 이미 존재합니다:",
-              statement.substring(0, 50) + "..."
-            );
+          if (
+            error.code === "ER_DUP_KEYNAME" ||
+            error.code === "ER_TABLE_EXISTS_ERROR"
+          ) {
+            const indexMatch = statement.match(/CREATE INDEX\s+(\w+)/i);
+            const indexName = indexMatch ? indexMatch[1] : "unknown";
+            console.log(`⚠️ 인덱스가 이미 존재합니다: ${indexName}`);
           } else {
+            console.error(`❌ 인덱스 생성 실패:`, error.message);
             throw error;
           }
         }
@@ -101,27 +121,48 @@ const runMigration = async () => {
       throw error;
     }
 
-    // 기존 테이블에 github_url 컬럼 추가 (이미 존재하면 무시)
+    // users 테이블 존재 여부 확인 후 컬럼 추가
     try {
-      await pool.execute(
-        "ALTER TABLE users ADD COLUMN github_url VARCHAR(500)"
-      );
-      console.log("✅ github_url 컬럼 추가 완료");
-    } catch (error: any) {
-      if (error.code === "ER_DUP_FIELDNAME") {
-        console.log("⚠️ github_url 컬럼이 이미 존재합니다");
-      } else {
-        throw error;
-      }
-    }
+      const [tables] = (await pool.execute("SHOW TABLES LIKE 'users'")) as any;
 
-    // 기존 테이블에 figma_url 컬럼 추가 (이미 존재하면 무시)
-    try {
-      await pool.execute("ALTER TABLE users ADD COLUMN figma_url VARCHAR(500)");
-      console.log("✅ figma_url 컬럼 추가 완료");
+      if (tables.length > 0) {
+        // 기존 테이블에 github_url 컬럼 추가 (이미 존재하면 무시)
+        try {
+          await pool.execute(
+            "ALTER TABLE users ADD COLUMN github_url VARCHAR(500)"
+          );
+          console.log("✅ github_url 컬럼 추가 완료");
+        } catch (error: any) {
+          if (error.code === "ER_DUP_FIELDNAME") {
+            console.log("⚠️ github_url 컬럼이 이미 존재합니다");
+          } else {
+            throw error;
+          }
+        }
+
+        // 기존 테이블에 figma_url 컬럼 추가 (이미 존재하면 무시)
+        try {
+          await pool.execute(
+            "ALTER TABLE users ADD COLUMN figma_url VARCHAR(500)"
+          );
+          console.log("✅ figma_url 컬럼 추가 완료");
+        } catch (error: any) {
+          if (error.code === "ER_DUP_FIELDNAME") {
+            console.log("⚠️ figma_url 컬럼이 이미 존재합니다");
+          } else {
+            throw error;
+          }
+        }
+      } else {
+        console.log(
+          "⚠️ users 테이블이 아직 생성되지 않았습니다. 스키마 파일에서 생성됩니다."
+        );
+      }
     } catch (error: any) {
-      if (error.code === "ER_DUP_FIELDNAME") {
-        console.log("⚠️ figma_url 컬럼이 이미 존재합니다");
+      if (error.code === "ER_NO_SUCH_TABLE") {
+        console.log(
+          "⚠️ users 테이블이 아직 생성되지 않았습니다. 스키마 파일에서 생성됩니다."
+        );
       } else {
         throw error;
       }
@@ -129,13 +170,25 @@ const runMigration = async () => {
 
     // teams 테이블에 collaboration_tools 컬럼 추가 (이미 존재하면 무시)
     try {
-      await pool.execute(
-        "ALTER TABLE teams ADD COLUMN collaboration_tools TEXT COMMENT '협업 툴 (콤마 구분)'"
-      );
-      console.log("✅ collaboration_tools 컬럼 추가 완료");
+      const [tables] = (await pool.execute("SHOW TABLES LIKE 'teams'")) as any;
+
+      if (tables.length > 0) {
+        await pool.execute(
+          "ALTER TABLE teams ADD COLUMN collaboration_tools TEXT COMMENT '협업 툴 (콤마 구분)'"
+        );
+        console.log("✅ collaboration_tools 컬럼 추가 완료");
+      } else {
+        console.log(
+          "⚠️ teams 테이블이 아직 생성되지 않았습니다. 스키마 파일에서 생성됩니다."
+        );
+      }
     } catch (error: any) {
       if (error.code === "ER_DUP_FIELDNAME") {
         console.log("⚠️ collaboration_tools 컬럼이 이미 존재합니다");
+      } else if (error.code === "ER_NO_SUCH_TABLE") {
+        console.log(
+          "⚠️ teams 테이블이 아직 생성되지 않았습니다. 스키마 파일에서 생성됩니다."
+        );
       } else {
         throw error;
       }
@@ -143,42 +196,76 @@ const runMigration = async () => {
 
     // users 테이블에 available_time 컬럼 추가 (이미 존재하면 무시)
     try {
-      await pool.execute(
-        "ALTER TABLE users ADD COLUMN available_time VARCHAR(255) COMMENT '일주일 내 가용 시간'"
-      );
-      console.log("✅ users.available_time 컬럼 추가 완료");
+      const [tables] = (await pool.execute("SHOW TABLES LIKE 'users'")) as any;
+
+      if (tables.length > 0) {
+        await pool.execute(
+          "ALTER TABLE users ADD COLUMN available_time VARCHAR(255) COMMENT '일주일 내 가용 시간'"
+        );
+        console.log("✅ users.available_time 컬럼 추가 완료");
+      } else {
+        console.log(
+          "⚠️ users 테이블이 아직 생성되지 않았습니다. 스키마 파일에서 생성됩니다."
+        );
+      }
     } catch (error: any) {
       if (error.code === "ER_DUP_FIELDNAME") {
         console.log("⚠️ users.available_time 컬럼이 이미 존재합니다");
+      } else if (error.code === "ER_NO_SUCH_TABLE") {
+        console.log(
+          "⚠️ users 테이블이 아직 생성되지 않았습니다. 스키마 파일에서 생성됩니다."
+        );
       } else {
         throw error;
       }
     }
 
     // awards 테이블에 새 필드 추가 (이미 존재하면 무시)
-    const awardFields = [
-      { name: "rank", sql: "VARCHAR(100)", needsBacktick: true },
-      { name: "participation_type", sql: "VARCHAR(100)", needsBacktick: false },
-      { name: "roles", sql: "TEXT", needsBacktick: false },
-      { name: "result_link", sql: "VARCHAR(500)", needsBacktick: false },
-      { name: "result_images", sql: "TEXT", needsBacktick: false },
-    ];
+    try {
+      const [tables] = (await pool.execute("SHOW TABLES LIKE 'awards'")) as any;
 
-    for (const field of awardFields) {
-      try {
-        const columnName = field.needsBacktick
-          ? `\`${field.name}\``
-          : field.name;
-        await pool.execute(
-          `ALTER TABLE awards ADD COLUMN ${columnName} ${field.sql}`
-        );
-        console.log(`✅ awards.${field.name} 컬럼 추가 완료`);
-      } catch (error: any) {
-        if (error.code === "ER_DUP_FIELDNAME") {
-          console.log(`⚠️ awards.${field.name} 컬럼이 이미 존재합니다`);
-        } else {
-          throw error;
+      if (tables.length > 0) {
+        const awardFields = [
+          { name: "rank", sql: "VARCHAR(100)", needsBacktick: true },
+          {
+            name: "participation_type",
+            sql: "VARCHAR(100)",
+            needsBacktick: false,
+          },
+          { name: "roles", sql: "TEXT", needsBacktick: false },
+          { name: "result_link", sql: "VARCHAR(500)", needsBacktick: false },
+          { name: "result_images", sql: "TEXT", needsBacktick: false },
+        ];
+
+        for (const field of awardFields) {
+          try {
+            const columnName = field.needsBacktick
+              ? `\`${field.name}\``
+              : field.name;
+            await pool.execute(
+              `ALTER TABLE awards ADD COLUMN ${columnName} ${field.sql}`
+            );
+            console.log(`✅ awards.${field.name} 컬럼 추가 완료`);
+          } catch (error: any) {
+            if (error.code === "ER_DUP_FIELDNAME") {
+              console.log(`⚠️ awards.${field.name} 컬럼이 이미 존재합니다`);
+            } else {
+              throw error;
+            }
+          }
         }
+      } else {
+        console.log(
+          "⚠️ awards 테이블이 아직 생성되지 않았습니다. 스키마 파일에서 생성됩니다."
+        );
+      }
+    } catch (error: any) {
+      if (error.code === "ER_NO_SUCH_TABLE") {
+        console.log(
+          "⚠️ awards 테이블이 아직 생성되지 않았습니다. 스키마 파일에서 생성됩니다."
+        );
+      } else {
+        throw error;
       }
     }
 
@@ -251,44 +338,62 @@ const runMigration = async () => {
     }
 
     // teams 테이블에 새 필드 추가 (이미 존재하면 무시)
-    const teamFields = [
-      {
-        name: "area_keywords",
-        sql: "TEXT COMMENT '분야 키워드 (JSON 배열 또는 콤마 구분)'",
-        needsBacktick: false,
-      },
-      {
-        name: "progress_stage",
-        sql: "VARCHAR(100) COMMENT '진행 단계'",
-        needsBacktick: false,
-      },
-      {
-        name: "meeting_schedule",
-        sql: "TEXT COMMENT '회의 주기 및 방식'",
-        needsBacktick: false,
-      },
-      {
-        name: "available_time_slots",
-        sql: "TEXT COMMENT '팀 활동 가능 시간대 (JSON 배열 또는 콤마 구분)'",
-        needsBacktick: false,
-      },
-    ];
+    try {
+      const [tables] = (await pool.execute("SHOW TABLES LIKE 'teams'")) as any;
 
-    for (const field of teamFields) {
-      try {
-        const columnName = field.needsBacktick
-          ? `\`${field.name}\``
-          : field.name;
-        await pool.execute(
-          `ALTER TABLE teams ADD COLUMN ${columnName} ${field.sql}`
-        );
-        console.log(`✅ teams.${field.name} 컬럼 추가 완료`);
-      } catch (error: any) {
-        if (error.code === "ER_DUP_FIELDNAME") {
-          console.log(`⚠️ teams.${field.name} 컬럼이 이미 존재합니다`);
-        } else {
-          throw error;
+      if (tables.length > 0) {
+        const teamFields = [
+          {
+            name: "area_keywords",
+            sql: "TEXT COMMENT '분야 키워드 (JSON 배열 또는 콤마 구분)'",
+            needsBacktick: false,
+          },
+          {
+            name: "progress_stage",
+            sql: "VARCHAR(100) COMMENT '진행 단계'",
+            needsBacktick: false,
+          },
+          {
+            name: "meeting_schedule",
+            sql: "TEXT COMMENT '회의 주기 및 방식'",
+            needsBacktick: false,
+          },
+          {
+            name: "available_time_slots",
+            sql: "TEXT COMMENT '팀 활동 가능 시간대 (JSON 배열 또는 콤마 구분)'",
+            needsBacktick: false,
+          },
+        ];
+
+        for (const field of teamFields) {
+          try {
+            const columnName = field.needsBacktick
+              ? `\`${field.name}\``
+              : field.name;
+            await pool.execute(
+              `ALTER TABLE teams ADD COLUMN ${columnName} ${field.sql}`
+            );
+            console.log(`✅ teams.${field.name} 컬럼 추가 완료`);
+          } catch (error: any) {
+            if (error.code === "ER_DUP_FIELDNAME") {
+              console.log(`⚠️ teams.${field.name} 컬럼이 이미 존재합니다`);
+            } else {
+              throw error;
+            }
+          }
         }
+      } else {
+        console.log(
+          "⚠️ teams 테이블이 아직 생성되지 않았습니다. 스키마 파일에서 생성됩니다."
+        );
+      }
+    } catch (error: any) {
+      if (error.code === "ER_NO_SUCH_TABLE") {
+        console.log(
+          "⚠️ teams 테이블이 아직 생성되지 않았습니다. 스키마 파일에서 생성됩니다."
+        );
+      } else {
+        throw error;
       }
     }
 

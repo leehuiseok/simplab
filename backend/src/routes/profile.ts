@@ -93,25 +93,39 @@ router.post(
 
     // 새로운 수상경력 추가
     if (awards.length > 0) {
-      const values = awards.map((award: any) => [
-        userId,
-        award.title,
-        award.awardedAt,
-        award.description || null,
-        award.rank || null,
-        award.participation_type || null,
-        award.roles
-          ? Array.isArray(award.roles)
-            ? JSON.stringify(award.roles)
-            : award.roles
-          : null,
-        award.result_link || null,
-        award.result_images
-          ? Array.isArray(award.result_images)
-            ? JSON.stringify(award.result_images)
-            : award.result_images
-          : null,
-      ]);
+      const values = awards.map((award: any) => {
+        // 날짜 형식 변환: ISO 8601 -> MySQL DATETIME 형식
+        let awardedAt = award.awardedAt;
+        if (awardedAt) {
+          const date = new Date(awardedAt);
+          if (!isNaN(date.getTime())) {
+            // MySQL DATETIME 형식: 'YYYY-MM-DD HH:MM:SS'
+            awardedAt = date.toISOString().slice(0, 19).replace("T", " ");
+          } else {
+            awardedAt = null;
+          }
+        }
+
+        return [
+          userId,
+          award.title,
+          awardedAt,
+          award.description || null,
+          award.rank || null,
+          award.participation_type || null,
+          award.roles
+            ? Array.isArray(award.roles)
+              ? JSON.stringify(award.roles)
+              : award.roles
+            : null,
+          award.result_link || null,
+          award.result_images
+            ? Array.isArray(award.result_images)
+              ? JSON.stringify(award.result_images)
+              : award.result_images
+            : null,
+        ];
+      });
 
       const placeholders = awards
         .map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)")
@@ -288,45 +302,75 @@ router.post(
 
     // 새로운 포트폴리오 추가
     if (portfolios.length > 0) {
-      const values = portfolios.map((portfolio: any) => [
-        userId,
-        portfolio.project_name,
-        portfolio.start_date || null,
-        portfolio.end_date || null,
-        portfolio.is_ongoing || false,
-        portfolio.participation_type || null,
-        portfolio.roles
-          ? Array.isArray(portfolio.roles)
-            ? JSON.stringify(portfolio.roles)
-            : portfolio.roles
-          : null,
-        portfolio.contribution_detail || null,
-        portfolio.goal || null,
-        portfolio.problem_definition || null,
-        portfolio.result_summary || null,
-        portfolio.tech_stack
-          ? Array.isArray(portfolio.tech_stack)
-            ? JSON.stringify(portfolio.tech_stack)
-            : portfolio.tech_stack
-          : null,
-        portfolio.images
-          ? Array.isArray(portfolio.images)
-            ? JSON.stringify(portfolio.images)
-            : portfolio.images
-          : null,
-        portfolio.github_link || null,
-        portfolio.figma_link || null,
-        portfolio.other_links
-          ? Array.isArray(portfolio.other_links)
-            ? JSON.stringify(portfolio.other_links)
-            : portfolio.other_links
-          : null,
-        portfolio.certifications
-          ? Array.isArray(portfolio.certifications)
-            ? JSON.stringify(portfolio.certifications)
-            : portfolio.certifications
-          : null,
-      ]);
+      const values = portfolios.map((portfolio: any) => {
+        // 날짜 형식 변환: ISO 8601 -> MySQL DATE/DATETIME 형식
+        let startDate = portfolio.start_date;
+        let endDate = portfolio.end_date;
+
+        if (startDate) {
+          const date = new Date(startDate);
+          if (!isNaN(date.getTime())) {
+            // MySQL DATE 형식: 'YYYY-MM-DD'
+            startDate = date.toISOString().slice(0, 10);
+          } else {
+            startDate = null;
+          }
+        } else {
+          startDate = null;
+        }
+
+        if (endDate) {
+          const date = new Date(endDate);
+          if (!isNaN(date.getTime())) {
+            // MySQL DATE 형식: 'YYYY-MM-DD'
+            endDate = date.toISOString().slice(0, 10);
+          } else {
+            endDate = null;
+          }
+        } else {
+          endDate = null;
+        }
+
+        return [
+          userId,
+          portfolio.project_name,
+          startDate,
+          endDate,
+          portfolio.is_ongoing || false,
+          portfolio.participation_type || null,
+          portfolio.roles
+            ? Array.isArray(portfolio.roles)
+              ? JSON.stringify(portfolio.roles)
+              : portfolio.roles
+            : null,
+          portfolio.contribution_detail || null,
+          portfolio.goal || null,
+          portfolio.problem_definition || null,
+          portfolio.result_summary || null,
+          portfolio.tech_stack
+            ? Array.isArray(portfolio.tech_stack)
+              ? JSON.stringify(portfolio.tech_stack)
+              : portfolio.tech_stack
+            : null,
+          portfolio.images
+            ? Array.isArray(portfolio.images)
+              ? JSON.stringify(portfolio.images)
+              : portfolio.images
+            : null,
+          portfolio.github_link || null,
+          portfolio.figma_link || null,
+          portfolio.other_links
+            ? Array.isArray(portfolio.other_links)
+              ? JSON.stringify(portfolio.other_links)
+              : portfolio.other_links
+            : null,
+          portfolio.certifications
+            ? Array.isArray(portfolio.certifications)
+              ? JSON.stringify(portfolio.certifications)
+              : portfolio.certifications
+            : null,
+        ];
+      });
 
       const placeholders = portfolios
         .map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
