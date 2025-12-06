@@ -26,7 +26,29 @@ export const config = {
   cors: {
     origin:
       process.env.NODE_ENV === "production"
-        ? ["https://yourdomain.com"]
+        ? (() => {
+            // 프로덕션 환경: 환경 변수로 허용 도메인 설정
+            const allowedDomains = process.env.ALLOWED_ORIGINS
+              ? process.env.ALLOWED_ORIGINS.split(",").map((domain) =>
+                  domain.trim()
+                )
+              : [];
+            // Cloudtype 도메인 패턴도 허용 (기본값)
+            const cloudtypePattern = /^https:\/\/.*\.cloudtype\.app$/;
+            return (
+              origin: string | undefined,
+              callback: (err: Error | null, allow?: boolean) => void
+            ) => {
+              if (!origin) {
+                return callback(null, true);
+              }
+              // 환경 변수에 명시된 도메인 또는 Cloudtype 도메인 허용
+              const isAllowed =
+                allowedDomains.includes(origin) ||
+                cloudtypePattern.test(origin);
+              callback(null, isAllowed);
+            };
+          })()
         : (
             origin: string | undefined,
             callback: (err: Error | null, allow?: boolean) => void
