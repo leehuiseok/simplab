@@ -64,6 +64,7 @@ export const config = {
               /^https:\/\/.*\.ngrok-free\.dev$/,
               /^https:\/\/.*\.ngrok\.io$/,
               /^https:\/\/.*\.ngrok-app\.com$/,
+              /^https:\/\/.*\.vercel\.app$/, // 개발 환경에서도 Vercel 허용
             ];
             const isAllowed = allowedOrigins.some((pattern) =>
               pattern.test(origin)
@@ -71,6 +72,10 @@ export const config = {
             callback(null, isAllowed);
           },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    exposedHeaders: ["Content-Range", "X-Content-Range"],
+    maxAge: 86400, // 24시간 (preflight 캐시)
   },
 };
 
