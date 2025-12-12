@@ -11,6 +11,20 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
 
+    const parseJsonish = (field: any): any => {
+      if (!field) return [];
+      try {
+        return JSON.parse(field);
+      } catch {
+        return typeof field === "string"
+          ? field
+              .split(",")
+              .map((s: string) => s.trim())
+              .filter((s: string) => s)
+          : [];
+      }
+    };
+
     // 사용자 기본 정보 조회
     const [users] = await pool.execute(
       "SELECT id, name, region, school, major, birth_date, job_field, skills, github_url, figma_url FROM users WHERE id = ?",
@@ -50,6 +64,21 @@ router.get(
     if (user.school) tags.push(user.school);
     if (user.major) tags.push(user.major);
 
+    // 포트폴리오 조회 (공개용)
+    const [portfolios] = await pool.execute(
+      "SELECT id, project_name, start_date, end_date, is_ongoing, participation_type, roles, contribution_detail, goal, problem_definition, result_summary, tech_stack, images, github_link, figma_link, other_links, certifications, created_at, updated_at FROM portfolios WHERE user_id = ? ORDER BY created_at DESC",
+      [id]
+    );
+
+    const parsedPortfolios = (portfolios as any[]).map((portfolio: any) => ({
+      ...portfolio,
+      roles: parseJsonish(portfolio.roles),
+      tech_stack: parseJsonish(portfolio.tech_stack),
+      images: parseJsonish(portfolio.images),
+      other_links: parseJsonish(portfolio.other_links),
+      certifications: parseJsonish(portfolio.certifications),
+    }));
+
     res.json({
       success: true,
       data: {
@@ -65,7 +94,7 @@ router.get(
             name: user.name,
           },
           awards: awards || [],
-          portfolioItems: [], // 포트폴리오는 별도로 구현 필요
+          portfolioItems: parsedPortfolios,
         },
       },
     });
