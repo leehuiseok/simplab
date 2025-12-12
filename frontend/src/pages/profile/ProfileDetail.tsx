@@ -27,13 +27,34 @@ type PortfolioItem = {
   description?: string | null;
   contribution?: string | null;
   techStack: string[];
+  startDate?: string | null;
+  endDate?: string | null;
+  isOngoing?: boolean;
+  participationType?: string | null;
+  roles?: string[];
+  images?: string[];
+  githubLink?: string | null;
+  figmaLink?: string | null;
+  otherLinks?: string[];
+  certifications?: string[];
 };
-type Award = { id: string; title: string; awardedAt?: string | null };
+type Award = {
+  id: string;
+  title: string;
+  awardedAt?: string | null;
+  description?: string | null;
+  rank?: string | null;
+  participation_type?: string | null;
+  roles?: string[];
+  result_link?: string | null;
+  result_images?: string[];
+};
 type Profile = {
   id: string;
   bio?: string | null;
   skills: string[];
   traits: string[];
+  traitsByCategory?: Record<string, string[]>;
   tags: string[];
   githubUrl?: string | null;
   figmaUrl?: string | null;
@@ -98,8 +119,6 @@ const ProfileDetailPage = () => {
         setProfile(null);
       });
   }, [id]);
-
-
 
   // 소속 팀 로드
   useEffect(() => {
@@ -210,8 +229,6 @@ const ProfileDetailPage = () => {
 
   // 로컬 더미 평가 로직 제거 (API 기반으로 대체)
 
-
-
   // (이전 더미 적합성 이유 로직 제거)
 
   // 키워드 후보: 스킬 + 성향 + 기본 키워드
@@ -255,13 +272,10 @@ const ProfileDetailPage = () => {
                 <div className="text-xl font-bold">
                   {profile?.user.name ?? `프로필 #${id}`}
                 </div>
-
               </div>
               <p className="text-sm text-slate-600">
                 {profile?.bio ?? "소개가 없습니다."}
               </p>
-
-
             </div>
           </div>
 
@@ -287,7 +301,47 @@ const ProfileDetailPage = () => {
         </div>
 
         <Section title="성향/작업방식">
-          {profile?.traits?.length ? profile.traits.join(", ") : "-"}
+          {profile?.traitsByCategory &&
+          Object.keys(profile.traitsByCategory).length > 0 ? (
+            <div className="space-y-3">
+              {Object.entries(profile.traitsByCategory).map(
+                ([category, traits]) => (
+                  <div key={category}>
+                    <div className="mb-1 text-xs font-medium text-slate-600">
+                      {category === "big5"
+                        ? "Big Five 성격"
+                        : category === "belbin"
+                        ? "Belbin 팀 역할"
+                        : category}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {traits.map((trait, idx) => (
+                        <span
+                          key={idx}
+                          className="rounded-full bg-purple-50 px-3 py-1 text-xs text-purple-700"
+                        >
+                          {trait}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+          ) : profile?.traits && profile.traits.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {profile.traits.map((trait, idx) => (
+                <span
+                  key={idx}
+                  className="rounded-full bg-purple-50 px-3 py-1 text-xs text-purple-700"
+                >
+                  {trait}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-slate-500">-</div>
+          )}
         </Section>
 
         {/* 키워드 토글 */}
@@ -320,53 +374,175 @@ const ProfileDetailPage = () => {
 
         <Section title="포트폴리오">
           <div className="space-y-4">
-            {(profile?.portfolioItems ?? []).map((p) => (
-              <div key={p.id} className="rounded border border-slate-200 p-3">
-                <div className="text-sm font-semibold">{p.title}</div>
-                {p.link ? (
-                  <a
-                    className="text-xs text-slate-600 underline"
-                    href={p.link}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {p.link}
-                  </a>
-                ) : null}
-                {p.description ? (
-                  <div className="mt-2 text-xs text-slate-700">
-                    {p.description}
+            {(profile?.portfolioItems ?? []).length === 0 ? (
+              <div className="text-sm text-slate-500">-</div>
+            ) : (
+              profile!.portfolioItems.map((p) => (
+                <div
+                  key={p.id}
+                  className="rounded-lg border border-slate-200 p-4 shadow-sm"
+                >
+                  <div className="mb-2 flex items-start justify-between">
+                    <div className="text-base font-semibold">{p.title}</div>
+                    {p.isOngoing && (
+                      <span className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-700">
+                        진행중
+                      </span>
+                    )}
                   </div>
-                ) : null}
-                {p.contribution ? (
-                  <div className="mt-1 text-xs text-slate-700">
-                    기여도: {p.contribution}
+                  {(p.startDate || p.endDate) && (
+                    <div className="mb-2 text-xs text-slate-500">
+                      {p.startDate
+                        ? new Date(p.startDate).toLocaleDateString()
+                        : ""}
+                      {p.startDate && p.endDate ? " ~ " : ""}
+                      {p.endDate
+                        ? new Date(p.endDate).toLocaleDateString()
+                        : ""}
+                    </div>
+                  )}
+                  {p.participationType && (
+                    <div className="mb-2 text-xs text-slate-600">
+                      참여 형태: {p.participationType}
+                    </div>
+                  )}
+                  {p.description && (
+                    <div className="mb-2 text-sm text-slate-700">
+                      {p.description}
+                    </div>
+                  )}
+                  {p.contribution && (
+                    <div className="mb-2 text-sm text-slate-700">
+                      <span className="font-medium">기여 내용:</span>{" "}
+                      {p.contribution}
+                    </div>
+                  )}
+                  {p.roles && p.roles.length > 0 && (
+                    <div className="mb-2 text-xs text-slate-600">
+                      역할: {p.roles.join(", ")}
+                    </div>
+                  )}
+                  {p.techStack && p.techStack.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-1">
+                      {p.techStack.map((tech, idx) => (
+                        <span
+                          key={idx}
+                          className="rounded bg-blue-50 px-2 py-1 text-xs text-blue-700"
+                        >
+                          {tech}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {p.githubLink && (
+                      <a
+                        href={p.githubLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-blue-600 underline hover:text-blue-800"
+                      >
+                        GitHub
+                      </a>
+                    )}
+                    {p.figmaLink && (
+                      <a
+                        href={p.figmaLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-blue-600 underline hover:text-blue-800"
+                      >
+                        Figma
+                      </a>
+                    )}
+                    {p.otherLinks &&
+                      p.otherLinks.map((link, idx) => (
+                        <a
+                          key={idx}
+                          href={link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-blue-600 underline hover:text-blue-800"
+                        >
+                          링크 {idx + 1}
+                        </a>
+                      ))}
                   </div>
-                ) : null}
-                {p.techStack?.length ? (
-                  <div className="mt-2 text-xs text-slate-600">
-                    스택: {p.techStack.join(", ")}
-                  </div>
-                ) : null}
-              </div>
-            ))}
+                </div>
+              ))
+            )}
           </div>
         </Section>
 
         <Section title="수상 경력">
-          {(profile?.awards ?? []).length ? (
-            <ul className="list-disc pl-5">
-              {profile!.awards.map((a) => (
-                <li key={a.id}>
-                  {a.title}{" "}
-                  {a.awardedAt
-                    ? `(${new Date(a.awardedAt).toLocaleDateString()})`
-                    : ""}
-                </li>
-              ))}
-            </ul>
+          {(profile?.awards ?? []).length === 0 ? (
+            <div className="text-sm text-slate-500">-</div>
           ) : (
-            "-"
+            <div className="space-y-3">
+              {profile!.awards.map((a) => (
+                <div
+                  key={a.id}
+                  className="rounded-lg border border-slate-200 p-4 shadow-sm"
+                >
+                  <div className="mb-2 flex items-start justify-between">
+                    <div className="text-base font-semibold">{a.title}</div>
+                    {a.rank && (
+                      <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">
+                        {a.rank}
+                      </span>
+                    )}
+                  </div>
+                  {a.awardedAt && (
+                    <div className="mb-2 text-xs text-slate-500">
+                      수상일: {new Date(a.awardedAt).toLocaleDateString()}
+                    </div>
+                  )}
+                  {a.participation_type && (
+                    <div className="mb-2 text-xs text-slate-600">
+                      참여 형태: {a.participation_type}
+                    </div>
+                  )}
+                  {a.description && (
+                    <div className="mb-2 text-sm text-slate-700">
+                      {a.description}
+                    </div>
+                  )}
+                  {a.roles && a.roles.length > 0 && (
+                    <div className="mb-2 text-xs text-slate-600">
+                      역할: {a.roles.join(", ")}
+                    </div>
+                  )}
+                  {a.result_link && (
+                    <div className="mt-2">
+                      <a
+                        href={a.result_link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-blue-600 underline hover:text-blue-800"
+                      >
+                        결과물 링크
+                      </a>
+                    </div>
+                  )}
+                  {a.result_images && a.result_images.length > 0 && (
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {a.result_images.map((img, idx) => (
+                        <img
+                          key={idx}
+                          src={img}
+                          alt={`${a.title} 결과물 ${idx + 1}`}
+                          className="h-24 w-full rounded border border-slate-200 object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display =
+                              "none";
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </Section>
 

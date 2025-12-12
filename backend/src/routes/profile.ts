@@ -43,6 +43,13 @@ router.get(
       [id]
     );
 
+    // 수상경력 파싱 (roles, result_images)
+    const parsedAwards = (awards as any[]).map((award: any) => ({
+      ...award,
+      roles: parseJsonish(award.roles),
+      result_images: parseJsonish(award.result_images),
+    }));
+
     // 성향 조회
     const [traits] = await pool.execute(
       "SELECT category, trait FROM user_traits WHERE user_id = ?",
@@ -51,6 +58,15 @@ router.get(
 
     // 성향을 평탄화된 리스트로 변환
     const traitsList = (traits as any[]).map((t) => t.trait);
+
+    // 성향을 카테고리별로 그룹화
+    const traitsByCategory: Record<string, string[]> = {};
+    (traits as any[]).forEach((t: any) => {
+      if (!traitsByCategory[t.category]) {
+        traitsByCategory[t.category] = [];
+      }
+      traitsByCategory[t.category].push(t.trait);
+    });
 
     // 스킬 파싱
     const skillsList = user.skills
@@ -70,14 +86,38 @@ router.get(
       [id]
     );
 
-    const parsedPortfolios = (portfolios as any[]).map((portfolio: any) => ({
-      ...portfolio,
-      roles: parseJsonish(portfolio.roles),
-      tech_stack: parseJsonish(portfolio.tech_stack),
-      images: parseJsonish(portfolio.images),
-      other_links: parseJsonish(portfolio.other_links),
-      certifications: parseJsonish(portfolio.certifications),
-    }));
+    // 포트폴리오를 프론트엔드 형식으로 변환
+    const parsedPortfolios = (portfolios as any[]).map((portfolio: any) => {
+      const techStack = parseJsonish(portfolio.tech_stack);
+      // github_link 또는 figma_link 중 하나를 link로 사용
+      const link = portfolio.github_link || portfolio.figma_link || null;
+      // description은 result_summary, goal, problem_definition 중 우선순위로 사용
+      const description =
+        portfolio.result_summary ||
+        portfolio.goal ||
+        portfolio.problem_definition ||
+        null;
+
+      return {
+        id: portfolio.id,
+        title: portfolio.project_name,
+        link: link,
+        description: description,
+        contribution: portfolio.contribution_detail || null,
+        techStack: techStack,
+        // 추가 정보도 포함 (필요시 사용 가능)
+        startDate: portfolio.start_date,
+        endDate: portfolio.end_date,
+        isOngoing: portfolio.is_ongoing,
+        participationType: portfolio.participation_type,
+        roles: parseJsonish(portfolio.roles),
+        images: parseJsonish(portfolio.images),
+        githubLink: portfolio.github_link,
+        figmaLink: portfolio.figma_link,
+        otherLinks: parseJsonish(portfolio.other_links),
+        certifications: parseJsonish(portfolio.certifications),
+      };
+    });
 
     res.json({
       success: true,
@@ -87,13 +127,14 @@ router.get(
           bio: `${user.region}에 거주하는 ${user.job_field}입니다.`,
           skills: skillsList,
           traits: traitsList,
+          traitsByCategory: traitsByCategory,
           tags: tags,
           githubUrl: user.github_url || null,
           figmaUrl: user.figma_url || null,
           user: {
             name: user.name,
           },
-          awards: awards || [],
+          awards: parsedAwards || [],
           portfolioItems: parsedPortfolios,
         },
       },
