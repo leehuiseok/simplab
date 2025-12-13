@@ -480,50 +480,6 @@ const ContestDetailPage = () => {
                 ))}
               </div>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold text-slate-800 mb-3">
-                난이도 지표
-              </h3>
-              <div className="flex gap-4">
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="radio"
-                    name="difficulty"
-                    value="beginner"
-                    className="mr-2"
-                    defaultChecked
-                  />
-                  <span className="text-sm text-slate-700">초급</span>
-                  <span className="ml-2 text-xs text-slate-500">
-                    (단순 아이디어 기획 중심)
-                  </span>
-                </label>
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="radio"
-                    name="difficulty"
-                    value="intermediate"
-                    className="mr-2"
-                  />
-                  <span className="text-sm text-slate-700">중급</span>
-                  <span className="ml-2 text-xs text-slate-500">
-                    (기획 + 간단 구현 필요)
-                  </span>
-                </label>
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="radio"
-                    name="difficulty"
-                    value="advanced"
-                    className="mr-2"
-                  />
-                  <span className="text-sm text-slate-700">고급</span>
-                  <span className="ml-2 text-xs text-slate-500">
-                    (실제 서비스 수준의 프로토타입 요구)
-                  </span>
-                </label>
-              </div>
-            </div>
           </div>
         </section>
 
